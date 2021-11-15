@@ -167,6 +167,8 @@ subroutine init_xcompact3d()
 
   use probes, only : init_probes
 
+  use particle, only: lpartack,partialloc
+
   implicit none
 
   integer :: ierr
@@ -222,6 +224,8 @@ subroutine init_xcompact3d()
   call decomp_info_init(nxm, nym, nz, ph3)
 
   call init_variables()
+
+  if(lpartack) call partialloc()
 
   call schemes()
 

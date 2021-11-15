@@ -37,6 +37,8 @@
 !      AUTHOR: Paul Bartholomew <paul.bartholomew08@imperial.ac.uk>
 !
 !###########################################################################
+!    add particle definition by J Fang, 15/11/2021
+!################################################################################
 subroutine parameter(input_i3d)
 
   use mpi
@@ -57,6 +59,8 @@ subroutine parameter(input_i3d)
   use probes, only : nprobes, setup_probes, flag_all_digits, flag_extra_probes, xyzprobes
   use visu, only : output2D
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
+
+  use particle, only: numparticle,lpartack
 
   implicit none
 
@@ -594,6 +598,8 @@ subroutine parameter_defaults()
   use probes, only : nprobes, flag_all_digits, flag_extra_probes
   use visu, only : output2D
   use forces, only : iforces, nvol
+
+  use particle,only : lpartack
 
   implicit none
 

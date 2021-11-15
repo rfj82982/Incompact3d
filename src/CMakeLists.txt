@@ -42,6 +42,7 @@ add_executable(xcompact3d
                     module_param.f90
                     navier.f90
                     parameters.f90
+                    particle.f90
                     poisson.f90
                     probes.f90
                     schemes.f90

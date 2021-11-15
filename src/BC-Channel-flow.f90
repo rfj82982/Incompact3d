@@ -34,6 +34,7 @@ module channel
   use decomp_2d
   use variables
   use param
+  use particle
 
   implicit none
 
@@ -48,6 +49,8 @@ module channel
 
 contains
   !############################################################################
+  !    add particle definition by J Fang, 15/11/2021
+  !################################################################################
   subroutine init_channel (ux1,uy1,uz1,ep1,phi1)
 
     use decomp_2d
@@ -124,7 +127,7 @@ contains
          phi1(:,xsize(2),:,:) = zero
        endif
     endif
-!
+    !
     ux1=zero
     uy1=zero
     uz1=zero
@@ -288,6 +291,17 @@ contains
     if (nrank .eq. 0) write(*,*) '# init end ok'
 #endif
 
+    !! particle tracking
+    if(lpartack) then
+      !
+      do i=1,numparticle
+        xpa(i)=0.d0
+        ypa(i)=1.d0
+        ypa(i)=2.d0
+      enddo
+      !
+    endif
+    !
     return
   end subroutine init_channel
   !############################################################################
