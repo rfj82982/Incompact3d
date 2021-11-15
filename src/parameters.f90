@@ -73,7 +73,7 @@ subroutine parameter(input_i3d)
        ivisu, ipost, &
        gravx, gravy, gravz, &
        cpg, idir_stream, &
-       ifilter, C_filter, iturbine
+       ifilter, C_filter, iturbine,numparticle
   NAMELIST /NumOptions/ ifirstder, isecondder, itimescheme, iimplicit, &
        nu0nu, cnu, ipinter
   NAMELIST /InOutParam/ irestart, icheckpoint, ioutput, nvisu, ilist, iprocessing, &
@@ -179,6 +179,9 @@ subroutine parameter(input_i3d)
      scalar_lbound(:) = -huge(one)
      scalar_ubound(:) = huge(one)
   endif
+
+  ! particle tracking activation
+  if(numparticle .ne. 0) lpartack=.true.
 
   if (ilmn) then
      if (istret.ne.0) then
@@ -487,6 +490,13 @@ subroutine parameter(input_i3d)
        end do
      endif
      write(*,*) '==========================================================='
+     if (lpartack) then
+       write(*,"(' Particle tracking      : ',A17)") "on"
+       write(*,"(' numparticle            : ',I17)") numparticle
+     else
+       write(*,"(' Particle tracking      : ',A17)") "off"
+     endif
+     write(*,*) '==========================================================='
      write(*,"(' spinup_time            : ',I17)") spinup_time
      write(*,"(' wrotation              : ',F17.8)") wrotation
      write(*,*) '==========================================================='
@@ -608,6 +618,8 @@ subroutine parameter_defaults()
   itime0 = 0
   t0 = zero
   datapath = './data/'
+
+  lpartack=.false.
 
   !! LES stuff
   SmagWallDamp=0

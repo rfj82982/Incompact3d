@@ -29,6 +29,8 @@
 !    problems with up to 0(10^5) computational cores, Int. J. of Numerical
 !    Methods in Fluids, vol 67 (11), pp 1735-1757
 !################################################################################
+!    add particle definition by J Fang, 15/11/2021
+!################################################################################
 module variables
   !USE param
   !USE var
@@ -281,7 +283,20 @@ module variables
   real(mytype),allocatable,dimension(:) :: xp,xpi,yp,ypi,dyp,zp,zpi,del
   real(mytype),allocatable,dimension(:) :: yeta,yetai
   real(mytype) :: alpha,beta
-
+  
+  ! particles
+  logical :: lpartack
+  integer :: numparticle
+  real(mytype),allocatable,dimension(:) :: xpa,ypa,zpa
+  real(mytype),allocatable,dimension(:) :: ux_pa,uy_pa,uz_pa
+  !+------------------+--------------------------------------------+
+  !|         lpartack | switch of particel tracking                |
+  !|      numparticle | number of particles in the domain          |
+  !|      xpa,ypa,zpa | x,y,z coordinates of particles             |
+  !|            ux_pa |                                            |
+  !|            uy_pa |                                            |
+  !|            uz_pa | velocity of particles                      |
+  !+------------------+--------------------------------------------+
 end module variables
 !############################################################################
 !############################################################################

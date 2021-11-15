@@ -28,8 +28,8 @@
 !    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
 !    problems with up to 0(10^5) computational cores, Int. J. of Numerical
 !    Methods in Fluids, vol 67 (11), pp 1735-1757
-!-------------------------------------------------------------------------------
-! start particle tracking functionality by J Fang, 15/11/2021
+!################################################################################
+!    start particle tracking functionality by J Fang, 15/11/2021
 !################################################################################
 
 program xcompact3d
