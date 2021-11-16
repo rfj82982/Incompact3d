@@ -213,6 +213,7 @@ contains
     return
 
   end subroutine intt
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!
   !!  SUBROUTINE: int_time
@@ -234,6 +235,7 @@ contains
     use param, only : scalar_lbound, scalar_ubound
     use variables, only : numscalar,nu0nu
     use var, only : ta1, tb1
+    use particle, only : lpartack,intt_particel
 #ifdef DEBG 
     use tools, only : avg3d
 #endif
@@ -330,6 +332,11 @@ contains
           call calc_rho_eos(rho1(:,:,:,1), ta1, phi1, tb1, xsize(1), xsize(2), xsize(3))
        ENDIF
     ENDIF
+    
+    !! partical tracking
+    if(lpartack) then
+      call intt_particel()
+    endif
 
 #ifdef DEBG
     if (nrank .eq. 0) write(*,*)'## End  int_time'

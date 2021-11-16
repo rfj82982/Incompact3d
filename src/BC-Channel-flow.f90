@@ -296,9 +296,11 @@ contains
       !
       do i=1,numparticle
         xpa(i)=0.d0
-        ypa(i)=1.d0
-        ypa(i)=2.d0
+        ypa(i)=yly/numparticle*(i-1)+0.1d0
+        zpa(i)=zlz/2.d0
       enddo
+      !
+      call partivelo(ux1,uy1,uz1)
       !
     endif
     !

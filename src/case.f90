@@ -260,6 +260,7 @@ contains
 
     use turbine, only : turbine_output
     use probes, only : write_probes
+    use particle,only : lpartack,write_particle
 
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)), intent(in) :: ux1, uy1, uz1
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),numscalar), intent(in) :: phi1
@@ -301,6 +302,10 @@ contains
     endif
 
     call write_probes(ux1, uy1, uz1, pp3, phi1)
+
+    if(lpartack) then
+      call write_particle()
+    endif
 
   end subroutine postprocessing
   !##################################################################
