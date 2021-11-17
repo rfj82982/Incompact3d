@@ -89,9 +89,7 @@ call init_xcompact3d()
         endif
         call calculate_transeq_rhs(drho1,dux1,duy1,duz1,dphi1,rho1,ux1,uy1,uz1,ep1,phi1,divu3)
         
-        if(lpartack) then
-          call partivelo(ux1,uy1,uz1)
-        endif
+        if(lpartack) call partivelo(ux1,uy1,uz1)
 
 #ifdef DEBG
         avg_param = zero
@@ -172,7 +170,7 @@ subroutine init_xcompact3d()
 
   use probes, only : init_probes
 
-  use particle, only: lpartack,partialloc
+  use particle, only: lpartack,init_particle
 
   implicit none
 
@@ -229,9 +227,7 @@ subroutine init_xcompact3d()
   call decomp_info_init(nxm, nym, nz, ph3)
 
   call init_variables()
-
-  if(lpartack) call partialloc()
-
+  
   call schemes()
 
   call decomp_2d_poisson_init()
@@ -267,7 +263,7 @@ subroutine init_xcompact3d()
      call preprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
   else
      itr=1
-     call init_sandbox(ux1,uy1,uz1,ep1,phi1,1)
+     ! call init_sandbox(ux1,uy1,uz1,ep1,phi1,1)
      call restart(ux1,uy1,uz1,dux1,duy1,duz1,ep1,pp3(:,:,:,1),phi1,dphi1,px1,py1,pz1,rho1,drho1,mu1,0)
 !     ux1(:,:,:)=ux1(:,:,:)-0.5
   endif
@@ -282,6 +278,8 @@ subroutine init_xcompact3d()
      call test_speed_min_max(ux1,uy1,uz1)
      if (iscalar==1) call test_scalar_min_max(phi1)
   endif
+
+  if(lpartack) call init_particle()
 
   call simu_stats(1)
 

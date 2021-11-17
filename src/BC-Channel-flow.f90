@@ -34,7 +34,6 @@ module channel
   use decomp_2d
   use variables
   use param
-  use particle
 
   implicit none
 
@@ -291,19 +290,6 @@ contains
     if (nrank .eq. 0) write(*,*) '# init end ok'
 #endif
 
-    !! particle tracking
-    if(lpartack) then
-      !
-      do i=1,numparticle
-        xpa(i)=0.d0
-        ypa(i)=yly/numparticle*(i-1)+0.1d0
-        zpa(i)=zlz/2.d0
-      enddo
-      !
-      call partivelo(ux1,uy1,uz1)
-      !
-    endif
-    !
     return
   end subroutine init_channel
   !############################################################################

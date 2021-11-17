@@ -60,7 +60,7 @@ subroutine parameter(input_i3d)
   use visu, only : output2D
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
 
-  use particle, only: numparticle,lpartack
+  use particle, only: numparticle,lpartack,ipartiout
 
   implicit none
 
@@ -81,7 +81,7 @@ subroutine parameter(input_i3d)
   NAMELIST /NumOptions/ ifirstder, isecondder, itimescheme, iimplicit, &
        nu0nu, cnu, ipinter
   NAMELIST /InOutParam/ irestart, icheckpoint, ioutput, nvisu, ilist, iprocessing, &
-       ninflows, ntimesteps, inflowpath, ioutflow, output2D, nprobes
+       ninflows, ntimesteps, inflowpath, ioutflow, output2D, nprobes, ipartiout
   NAMELIST /Statistics/ wrotation,spinup_time, nstat, initstat
   NAMELIST /ProbesParam/ flag_all_digits, flag_extra_probes, xyzprobes
   NAMELIST /ScalarParam/ sc, ri, uset, cp, &
@@ -599,7 +599,7 @@ subroutine parameter_defaults()
   use visu, only : output2D
   use forces, only : iforces, nvol
 
-  use particle,only : lpartack
+  use particle,only : lpartack,ipartiout
 
   implicit none
 
@@ -626,6 +626,7 @@ subroutine parameter_defaults()
   datapath = './data/'
 
   lpartack=.false.
+  ipartiout=1
 
   !! LES stuff
   SmagWallDamp=0

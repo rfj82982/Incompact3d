@@ -17,12 +17,14 @@ module particle
   end interface
   ! particles
   logical :: lpartack
-  integer :: numparticle
+  integer :: numparticle,ipartiout,ipartiadd
+  real(mytype) :: xpamin,xpamax,ypamin,ypamax,zpamin,zpamax
   real(mytype),allocatable,dimension(:) :: xpa,ypa,zpa
   real(mytype),allocatable,dimension(:) :: ux_pa,uy_pa,uz_pa
   !+------------------+--------------------------------------------+
   !|         lpartack | switch of particel tracking                |
   !|      numparticle | number of particles in the domain          |
+  !|        ipartiout | frequency of output particles              |
   !|      xpa,ypa,zpa | x,y,z coordinates of particles             |
   !|            ux_pa |                                            |
   !|            uy_pa |                                            |
@@ -32,21 +34,90 @@ module particle
   contains
   !
   !+-------------------------------------------------------------------+
-  !| This subroutine is to allocate particle arraies.                  |
+  !| This subroutine is to initilise particle positions.               |
   !+-------------------------------------------------------------------+
   !| CHANGE RECORD                                                     |
   !| -------------                                                     |
-  !| 15-11-2021  | Created by J. Fang                                  |
+  !| 17-11-2021  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine partialloc
+  subroutine init_particle
     !
-    !! particle tracking
+    use param,     only : xlx,yly,zlz
+    !
+    ! local data
+    integer :: i
+    !
     allocate(xpa(1:numparticle),ypa(1:numparticle),zpa(1:numparticle))
     allocate(ux_pa(1:numparticle),uy_pa(1:numparticle),uz_pa(1:numparticle))
     !
-  end subroutine partialloc
+    ypamin=0.1
+    ypamax=1.9
+    !
+    do i=1,numparticle
+      xpa(i)=0.d0
+      ypa(i)=(ypamin-ypamax)/real(numparticle,mytype)*real(i,mytype)+ypamax
+      zpa(i)=zlz/2.d0
+    enddo
+    !
+    call write_particle()
+    !
+  end subroutine init_particle
   !+-------------------------------------------------------------------+
-  ! The end of the subroutine partialloc                               |
+  ! The end of the subroutine init_particle                            |
+  !+-------------------------------------------------------------------+
+  !!
+  !+-------------------------------------------------------------------+
+  !| This subroutine is to add more particles to the domain.           |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 17-11-2021  | Created by J. Fang                                  |
+  !+-------------------------------------------------------------------+
+  subroutine partile_inject(numadd)
+    !
+    use param,     only : xlx,yly,zlz
+    !
+    integer,intent(in) :: numadd
+    !
+    ! local data
+    real(mytype),allocatable,dimension(:) :: xpa_add,ypa_add,zpa_add
+    real(mytype),allocatable,dimension(:) :: ux_pa_add,uy_pa_add,uz_pa_add
+    integer :: i,p
+    !
+    allocate(xpa_add(numparticle+numadd),ypa_add(numparticle+numadd),  &
+             zpa_add(numparticle+numadd),ux_pa_add(numparticle+numadd),&
+             uy_pa_add(numparticle+numadd),uz_pa_add(numparticle+numadd))
+    !
+    xpa_add(1:numparticle)=xpa(1:numparticle)
+    ypa_add(1:numparticle)=ypa(1:numparticle)
+    zpa_add(1:numparticle)=zpa(1:numparticle)
+    !
+    ux_pa_add(1:numparticle)=ux_pa(1:numparticle)
+    uy_pa_add(1:numparticle)=uy_pa(1:numparticle)
+    uz_pa_add(1:numparticle)=uz_pa(1:numparticle)
+    !
+    do p=1,numadd
+      i=p+numparticle
+      !
+      xpa_add(i)=0.d0
+      ypa_add(i)=(ypamin-ypamax)/real(numadd,mytype)*real(p,mytype)+ypamax
+      zpa_add(i)=zlz/2.d0
+    enddo
+    !
+    deallocate(xpa,ypa,zpa,ux_pa,uy_pa,uz_pa)
+    !
+    call move_alloc(xpa_add, xpa)
+    call move_alloc(ypa_add, ypa)
+    call move_alloc(zpa_add, zpa)
+    call move_alloc(ux_pa_add, ux_pa)
+    call move_alloc(uy_pa_add, uy_pa)
+    call move_alloc(uz_pa_add, uz_pa)
+    !
+    numparticle=numparticle+numadd
+    !
+  end subroutine partile_inject
+  !+-------------------------------------------------------------------+
+  ! The end of the subroutine partile_add                              |
   !+-------------------------------------------------------------------+
   !!
   !+-------------------------------------------------------------------+
@@ -115,19 +186,19 @@ module particle
       nzr=xend(3)
       zmax=real(nzr,mytype)*dz
       !
-      write(rankname,'(i4.4)')nrank
-      open(18,file='testout/tecfield'//rankname//'.dat')
-      write(18,'(A)')' VARIABLES = "x" "y" "z" "u_halo"'
-      write(18,'(A)')'ZONE T="ZONE 001"'
-      write(18,'(3(A,I0),A)')'I=',xsize(1),', J=',xsize(2),', K=',xsize(3),', ZONETYPE=Ordered'
-      write(18,'(A)')'DATAPACKING=POINT'
-      do k=1,xsize(3)
-      do j=1,xsize(2)
-      do i=1,xsize(1)
-        write(18,'(4(1X,E20.13E2))')xx(i),yy(j),zz(k),ux1(i,j,k)
-      enddo
-      enddo
-      enddo
+      ! write(rankname,'(i4.4)')nrank
+      ! open(18,file='testout/tecfield'//rankname//'.dat')
+      ! write(18,'(A)')' VARIABLES = "x" "y" "z" "u_halo"'
+      ! write(18,'(A)')'ZONE T="ZONE 001"'
+      ! write(18,'(3(A,I0),A)')'I=',xsize(1),', J=',xsize(2),', K=',xsize(3),', ZONETYPE=Ordered'
+      ! write(18,'(A)')'DATAPACKING=POINT'
+      ! do k=1,xsize(3)
+      ! do j=1,xsize(2)
+      ! do i=1,xsize(1)
+      !   write(18,'(4(1X,E20.13E2))')xx(i),yy(j),zz(k),ux1(i,j,k)
+      ! enddo
+      ! enddo
+      ! enddo
     ! print*,' << testout/tecfield',rankname,'.dat'
       !
       ! print*,nrank,'|x',xmin,'~',xmax
@@ -335,6 +406,7 @@ module particle
   subroutine write_particle
     !
     use decomp_2d, only : nrank
+    use param, only : t
     !
     ! local data
     integer :: p
@@ -354,6 +426,7 @@ module particle
       open(18,file='./data/particle.dat',position="append")
       write(18,'(A)')'ZONE T="ZONE 001"'
       write(18,'(A,I0,A)')'I=',numparticle,', J=1, K=1, ZONETYPE=Ordered'
+      write(18,'(A,E13.6E2)')'STRANDID=0, SOLUTIONTIME=',t
       write(18,'(A)')'DATAPACKING=POINT'
       do p=1,numparticle
         write(18,*)xpa(p),ypa(p),zpa(p)
