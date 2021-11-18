@@ -60,7 +60,7 @@ subroutine parameter(input_i3d)
   use visu, only : output2D
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
 
-  use particle, only: numparticle,lpartack,ipartiout
+  use particle, only: numparticle,lpartack,partirange,ipartiout,numpartix
 
   implicit none
 
@@ -77,11 +77,11 @@ subroutine parameter(input_i3d)
        ivisu, ipost, &
        gravx, gravy, gravz, &
        cpg, idir_stream, &
-       ifilter, C_filter, iturbine,numparticle
+       ifilter, C_filter, iturbine
   NAMELIST /NumOptions/ ifirstder, isecondder, itimescheme, iimplicit, &
        nu0nu, cnu, ipinter
   NAMELIST /InOutParam/ irestart, icheckpoint, ioutput, nvisu, ilist, iprocessing, &
-       ninflows, ntimesteps, inflowpath, ioutflow, output2D, nprobes, ipartiout
+       ninflows, ntimesteps, inflowpath, ioutflow, output2D, nprobes
   NAMELIST /Statistics/ wrotation,spinup_time, nstat, initstat
   NAMELIST /ProbesParam/ flag_all_digits, flag_extra_probes, xyzprobes
   NAMELIST /ScalarParam/ sc, ri, uset, cp, &
@@ -102,6 +102,7 @@ subroutine parameter(input_i3d)
   NAMELIST /CASE/ tgv_twod, pfront
   NAMELIST/ALMParam/ialmrestart,filealmrestart,iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
+  NAMELIST/PartiParam/ipartiout,numpartix,partirange
 
 #ifdef DEBG
   if (nrank == 0) write(*,*) '# parameter start'
@@ -184,9 +185,6 @@ subroutine parameter(input_i3d)
      scalar_ubound(:) = huge(one)
   endif
 
-  ! particle tracking activation
-  if(numparticle .ne. 0) lpartack=.true.
-
   if (ilmn) then
      if (istret.ne.0) then
         if (nrank.eq.0) then
@@ -219,6 +217,8 @@ subroutine parameter(input_i3d)
   if (numscalar.ne.0) then
      read(10, nml=ScalarParam); rewind(10)
   endif
+
+  read(10, nml=PartiParam); rewind(10) !! read particle 
   ! !! These are the 'optional'/model parameters
   ! read(10, nml=ScalarParam)
   if(ilesmod==0) then
@@ -242,6 +242,10 @@ subroutine parameter(input_i3d)
   ! read(10, nml=TurbulenceWallModel)
   read(10, nml=CASE); rewind(10) !! Read case-specific variables
   close(10)
+
+  ! particle tracking activation
+  numparticle=numpartix(1)*numpartix(2)*numpartix(3)
+  if(numparticle .ne. 0) lpartack=.true.
 
   ! allocate(sc(numscalar),cp(numscalar),ri(numscalar),group(numscalar))
 

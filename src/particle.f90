@@ -18,13 +18,17 @@ module particle
   ! particles
   logical :: lpartack
   integer :: numparticle,ipartiout,ipartiadd
-  real(mytype) :: xpamin,xpamax,ypamin,ypamax,zpamin,zpamax
+  real(mytype) :: partirange(6)
+  integer :: numpartix(3)
   real(mytype),allocatable,dimension(:) :: xpa,ypa,zpa
   real(mytype),allocatable,dimension(:) :: ux_pa,uy_pa,uz_pa
   !+------------------+--------------------------------------------+
   !|         lpartack | switch of particel tracking                |
   !|      numparticle | number of particles in the domain          |
   !|        ipartiout | frequency of output particles              |
+  !|        ipartiadd | frequency of add new particles             |
+  !|       partirange | the domain where the particles are injucted|
+  !|        numpartix | the matrix of particle number              |
   !|      xpa,ypa,zpa | x,y,z coordinates of particles             |
   !|            ux_pa |                                            |
   !|            uy_pa |                                            |
@@ -45,18 +49,26 @@ module particle
     use param,     only : xlx,yly,zlz
     !
     ! local data
-    integer :: i
+    integer :: i,j,k,p
     !
     allocate(xpa(1:numparticle),ypa(1:numparticle),zpa(1:numparticle))
     allocate(ux_pa(1:numparticle),uy_pa(1:numparticle),uz_pa(1:numparticle))
     !
-    ypamin=0.1
-    ypamax=1.9
-    !
-    do i=1,numparticle
-      xpa(i)=0.d0
-      ypa(i)=(ypamin-ypamax)/real(numparticle,mytype)*real(i,mytype)+ypamax
-      zpa(i)=zlz/2.d0
+    p=0
+    do k=1,numpartix(3)
+    do j=1,numpartix(2)
+    do i=1,numpartix(1)
+      !
+      p=p+1
+      !
+      xpa(p)=(partirange(2)-partirange(1))/real(numpartix(1),mytype)*  &
+              real(i,mytype)+partirange(1)
+      ypa(p)=(partirange(4)-partirange(3))/real(numpartix(2),mytype)*  &
+              real(j,mytype)+partirange(3)
+      zpa(p)=(partirange(6)-partirange(5))/real(numpartix(3),mytype)*  &
+              real(k,mytype)+partirange(5)
+    enddo
+    enddo
     enddo
     !
     call write_particle()
@@ -82,7 +94,7 @@ module particle
     ! local data
     real(mytype),allocatable,dimension(:) :: xpa_add,ypa_add,zpa_add
     real(mytype),allocatable,dimension(:) :: ux_pa_add,uy_pa_add,uz_pa_add
-    integer :: i,p
+    integer :: i,j,k,p
     !
     allocate(xpa_add(numparticle+numadd),ypa_add(numparticle+numadd),  &
              zpa_add(numparticle+numadd),ux_pa_add(numparticle+numadd),&
@@ -96,12 +108,21 @@ module particle
     uy_pa_add(1:numparticle)=uy_pa(1:numparticle)
     uz_pa_add(1:numparticle)=uz_pa(1:numparticle)
     !
-    do p=1,numadd
-      i=p+numparticle
+    p=numparticle
+    do k=1,numpartix(3)
+    do j=1,numpartix(2)
+    do i=1,numpartix(1)
       !
-      xpa_add(i)=0.d0
-      ypa_add(i)=(ypamin-ypamax)/real(numadd,mytype)*real(p,mytype)+ypamax
-      zpa_add(i)=zlz/2.d0
+      p=p+1
+      !
+      xpa_add(p)=(partirange(2)-partirange(1))/real(numpartix(1),mytype)*  &
+                 real(i,mytype)+partirange(1)
+      ypa_add(p)=(partirange(4)-partirange(3))/real(numpartix(2),mytype)*  &
+                  real(j,mytype)+partirange(3)
+      zpa_add(p)=(partirange(6)-partirange(5))/real(numpartix(3),mytype)*  &
+                 real(k,mytype)+partirange(5)
+    enddo
+    enddo
     enddo
     !
     deallocate(xpa,ypa,zpa,ux_pa,uy_pa,uz_pa)
