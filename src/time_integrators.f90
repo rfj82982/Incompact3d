@@ -235,7 +235,7 @@ contains
     use param, only : scalar_lbound, scalar_ubound
     use variables, only : numscalar,nu0nu
     use var, only : ta1, tb1
-    use particle, only : lpartack,intt_particel
+    use partack, only : lpartack,intt_particel
 #ifdef DEBG 
     use tools, only : avg3d
 #endif

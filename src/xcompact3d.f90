@@ -46,7 +46,7 @@ program xcompact3d
   use ibm_param
   use ibm, only : body
   use genepsi, only : genepsi3d
-  use particle,only : lpartack,partivelo
+  use partack,only : lpartack,partivelo
 #ifdef DEBG 
   use tools, only : avg3d
 #endif
@@ -170,7 +170,7 @@ subroutine init_xcompact3d()
 
   use probes, only : init_probes
 
-  use particle, only: lpartack,init_particle
+  use partack, only: lpartack,local_domain_size,init_particle
 
   implicit none
 
@@ -279,7 +279,11 @@ subroutine init_xcompact3d()
      if (iscalar==1) call test_scalar_min_max(phi1)
   endif
 
-  if(lpartack) call init_particle()
+  if(lpartack) then
+    call local_domain_size()
+    !
+    call init_particle()
+  endif
 
   call simu_stats(1)
 
@@ -300,7 +304,7 @@ subroutine init_xcompact3d()
      endif
   endif
 
-endsubroutine init_xcompact3d
+end subroutine init_xcompact3d
 !########################################################################
 !########################################################################
 subroutine finalise_xcompact3d()
@@ -312,6 +316,7 @@ subroutine finalise_xcompact3d()
   use param, only : itype
   use probes, only : finalize_probes
   use visu, only : visu_finalise
+  use partack, only: lpartack,partcle_report
 
   implicit none
 
@@ -329,6 +334,9 @@ subroutine finalise_xcompact3d()
   endif
   
   call simu_stats(4)
+  !
+  if(lpartack) call partcle_report
+  !
   call finalize_probes()
   call visu_finalise()
   call decomp_2d_finalize

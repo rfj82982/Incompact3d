@@ -60,7 +60,7 @@ subroutine parameter(input_i3d)
   use visu, only : output2D
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
 
-  use particle, only: numparticle,lpartack,partirange,ipartiout,numpartix
+  use partack, only: numparticle,lpartack,partirange,ipartiout,numpartix
 
   implicit none
 
@@ -244,8 +244,8 @@ subroutine parameter(input_i3d)
   close(10)
 
   ! particle tracking activation
-  numparticle=numpartix(1)*numpartix(2)*numpartix(3)
-  if(numparticle .ne. 0) lpartack=.true.
+  ! numparticle=numpartix(1)*numpartix(2)*numpartix(3)
+  if(numpartix(1)*numpartix(2)*numpartix(3) .ne. 0) lpartack=.true.
 
   ! allocate(sc(numscalar),cp(numscalar),ri(numscalar),group(numscalar))
 
@@ -603,7 +603,7 @@ subroutine parameter_defaults()
   use visu, only : output2D
   use forces, only : iforces, nvol
 
-  use particle,only : lpartack,ipartiout
+  use partack,only : lpartack,ipartiout
 
   implicit none
 
