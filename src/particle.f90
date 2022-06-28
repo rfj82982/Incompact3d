@@ -42,12 +42,17 @@ module partack
   ! particles
   type partype
     !
-    real(mytype) :: x,y,z,u,v,w
+    real(mytype) :: x(3),v(3)
+    real(mytype),allocatable,dimension(:,:) :: dx,dv
     integer :: id,rankinn,rank2go
     logical :: swap,new
     !+------------------+------------------------------------------+
-    !|            x,y,z | spatial coordinates of particle          |
-    !|            u,v,w | velocity of particle                     |
+    !|                x | spatial coordinates of particle          |
+    !|                v | velocity of particle                     |
+    !|               dx | gradient of x,y,z to time, used for      |
+    !|                  | temporal integration.                    |
+    !|               dv | gradient of u,v,w to time, used for      |
+    !|                  | temporal integration.                    |
     !|               id | the identification of particle           |
     !|          rankinn | the mpi rank which the particle is in    |
     !|          rank2go | the mpi rank which the particle will be  |
@@ -55,8 +60,8 @@ module partack
     !
     contains
     !
-    procedure :: init => init_one_particle
-    procedure :: reset => init_one_particle
+    procedure :: init  => init_one_particle
+    procedure :: reset => reset_one_particle
     !
   end type partype
   !
@@ -70,7 +75,9 @@ module partack
   real(mytype),allocatable,dimension(:) :: xpa,ypa,zpa
   real(mytype),allocatable,dimension(:) :: ux_pa,uy_pa,uz_pa
   character(len=4) :: rankname
-  real(8) :: part_time,part_comm_time,part_vel_time,part_dmck_time,a2a_time
+  real(8) :: part_time,part_comm_time,part_vel_time,part_dmck_time,a2a_time, &
+             count_time,data_pack_time,data_unpack_time,mpi_comm_time,       &
+             table_share_time
   !+------------------+--------------------------------------------+
   !|         lpartack | switch of particel tracking                |
   !|      numparticle | number of particles in the domain          |
@@ -94,6 +101,8 @@ module partack
   !+-------------------------------------------------------------------+
   subroutine init_one_particle(pa)
     !
+    use param, only : ntime
+    !
     class(partype),target :: pa
     !
     pa%swap=.false.
@@ -102,13 +111,45 @@ module partack
     pa%rankinn=nrank
     pa%rank2go=nrank
     !
-    pa%x=0.d0; pa%u=0.d0
-    pa%y=0.d0; pa%v=0.d0
-    pa%z=0.d0; pa%w=0.d0
+    pa%x=0.0; pa%v=0.0
+    !
+    allocate(pa%dx(1:3,2:ntime),pa%dv(1:3,ntime))
+    !
+    pa%dx=0.0
+    pa%dv=0.0
     !
   end subroutine init_one_particle
   !+-------------------------------------------------------------------+
   !| The end of the subroutine initmesg.                               |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is used to reset a particle.                       |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 28-Jun-2022  | Created by J. Fang @ Imperial College              |
+  !+-------------------------------------------------------------------+
+  subroutine reset_one_particle(pa)
+    !
+    use param, only : ntime
+    !
+    class(partype),target :: pa
+    !
+    pa%swap=.false.
+    pa%new =.true.
+    !
+    pa%rankinn=nrank
+    pa%rank2go=nrank
+    !
+    pa%x=0.0; pa%v=0.0
+    !
+    pa%dx=0.0
+    pa%dv=0.0
+    !
+  end subroutine reset_one_particle
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine reset_one_particle.                     |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -128,9 +169,14 @@ module partack
       write(*,*) 'Total number of particles:',ttal_particle
       write(*,*) 'Total time for particles :',real(part_time,4)
       write(*,*) '      time particles vel :',real(part_vel_time,4)
-      write(*,*) '      time particles com :',real(part_comm_time,4)
-      write(*,*) '      time alltoall comm :',real(a2a_time,4)
       write(*,*) '      time domain search :',real(part_dmck_time,4)
+      write(*,*) '      time partical_swap :',real(part_comm_time,4)
+      write(*,*) '           alltoall comm :',real(a2a_time,4)
+      write(*,*) '           counting time :',real(count_time,4)
+      write(*,*) '           table shareing:',real(table_share_time,4)
+      write(*,*) '           data packing  :',real(data_pack_time,4)
+      write(*,*) '           MPI Alltoall  :',real(mpi_comm_time,4)
+      write(*,*) '           data unpacking:',real(data_unpack_time,4)
     endif
     !
   end subroutine partcle_report
@@ -166,16 +212,17 @@ module partack
       do j=1,numpartix(2)
       do i=1,numpartix(1)
         !
-        dy=(partirange(4)-partirange(3))/real(numpartix(2)-1,mytype)
-        dz=(partirange(6)-partirange(5))/real(numpartix(3)-1,mytype)
+        dx=(partirange(2)-partirange(1))/real(numpartix(1),mytype)
+        dy=(partirange(4)-partirange(3))/real(numpartix(2),mytype)
+        dz=(partirange(6)-partirange(5))/real(numpartix(3),mytype)
         !
         p=p+1
         !
         call particle(p)%init()
         !
-        particle(p)%x=0.1d0
-        particle(p)%y=dy*real(j-1,mytype)+partirange(3)
-        particle(p)%z=dz*real(k-1,mytype)+partirange(5)
+        particle(p)%x(1)=dx*real(i,mytype)+partirange(1)
+        particle(p)%x(2)=dy*real(j,mytype)+partirange(3)
+        particle(p)%x(3)=dz*real(k,mytype)+partirange(5)
         !
         particle(p)%new=.false.
         !
@@ -199,10 +246,10 @@ module partack
     !   !
     !   p=p+1
     !   !
-    !   particle(p)%x=0.0001d0
+    !   particle(p)%x(1)=0.0001d0
     !   !
-    !   particle(p)%y=dy*real(j,mytype)+lymin(nrank)-0.5d0*dy
-    !   particle(p)%z=dz*real(k,mytype)+lzmin(nrank)-0.5d0*dz
+    !   particle(p)%x(2)=dy*real(j,mytype)+lymin(nrank)-0.5d0*dy
+    !   particle(p)%x(3)=dz*real(k,mytype)+lzmin(nrank)-0.5d0*dz
     !   !
     !   particle(p)%rankinn=nrank
     !   !
@@ -224,6 +271,11 @@ module partack
     part_vel_time=0.d0
     part_dmck_time=0.d0
     a2a_time=0.d0
+    count_time=0.d0
+    table_share_time=0.d0
+    data_pack_time=0.d0
+    data_unpack_time=0.d0
+    mpi_comm_time=0.d0
     ! call mpistop
     !
   end subroutine init_particle
@@ -359,7 +411,7 @@ module partack
   !| -------------                                                     |
   !| 15-11-2021  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine partivelo(ux1,uy1,uz1)
+  subroutine particle_velo(ux1,uy1,uz1)
     !
     use MPI
     use param,     only : dx,dy,dz,istret,nclx,ncly,nclz,xlx,yly,zlz
@@ -512,15 +564,15 @@ module partack
             x1=xx(i)
             x2=xx(i+1)
             !
-            if( pa%x>=x1 .and. pa%x<x2 .and. &
-                pa%y>=y1 .and. pa%y<y2 .and. &
-                pa%z>=z1 .and. pa%z<z2 ) then
+            if( pa%x(1)>=x1 .and. pa%x(1)<x2 .and. &
+                pa%x(2)>=y1 .and. pa%x(2)<y2 .and. &
+                pa%x(3)>=z1 .and. pa%x(3)<z2 ) then
               !
               ! locate the particle, do the interpolation
               ! print*,x1,x2,y1,y2,z1,z2
-              pa%u=trilinear_interpolation( x1,y1,z1,            &
+              pa%v(1)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
-                                            pa%x,pa%y,pa%z,      &
+                                            pa%x(1),pa%x(2),pa%x(3),      &
                                             ux1_hal2(i,j,k),     &
                                             ux1_hal2(i+1,j,k),   &
                                             ux1_hal2(i,j,k+1),   &
@@ -529,9 +581,9 @@ module partack
                                             ux1_hal2(i+1,j+1,k), &
                                             ux1_hal2(i,j+1,k+1), &
                                             ux1_hal2(i+1,j+1,k+1))
-              pa%v=trilinear_interpolation( x1,y1,z1,            &
+              pa%v(2)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
-                                            pa%x,pa%y,pa%z,      &
+                                            pa%x(1),pa%x(2),pa%x(3),      &
                                             uy1_hal2(i,j,k),     &
                                             uy1_hal2(i+1,j,k),   &
                                             uy1_hal2(i,j,k+1),   &
@@ -540,9 +592,9 @@ module partack
                                             uy1_hal2(i+1,j+1,k), &
                                             uy1_hal2(i,j+1,k+1), &
                                             uy1_hal2(i+1,j+1,k+1)) 
-              pa%w=trilinear_interpolation( x1,y1,z1,            &
+              pa%v(3)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
-                                            pa%x,pa%y,pa%z,      &
+                                            pa%x(1),pa%x(2),pa%x(3),      &
                                             uz1_hal2(i,j,k),     &
                                             uz1_hal2(i+1,j,k),   &
                                             uz1_hal2(i,j,k+1),   &
@@ -580,9 +632,9 @@ module partack
     !
     ! call mpistop()
     !
-  end subroutine partivelo
+  end subroutine particle_velo
   !+-------------------------------------------------------------------+
-  ! The end of the subroutine partivelo                                |
+  ! The end of the subroutine particle_velo                            |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -596,34 +648,104 @@ module partack
   !+-------------------------------------------------------------------+
   subroutine intt_particel
     !
-    use param, only : gdt,itr
+    use variables 
+    use param
     !
     ! local data 
     integer :: p,psize,jpart,npart
     type(partype),pointer :: pa
     real(8) :: timebeg
     !
+    real(8),allocatable :: xcor(:,:),dxco(:,:,:)
+    !
     timebeg=ptime()
+    !
+    allocate(xcor(3,numparticle),dxco(3,numparticle,ntime))
     !
     psize=msize(particle)
     !
-    npart=0
+    ! duplicat the particle array to local array
     !
+    npart=0
     do jpart=1,psize
       !
       pa=>particle(jpart)
       !
       if(pa%new) cycle
       !
-      pa%x=gdt(itr)*pa%u+pa%x
-      pa%y=gdt(itr)*pa%v+pa%y
-      pa%z=gdt(itr)*pa%w+pa%z
-      !
       npart=npart+1
+      !
+      xcor(:,npart)=pa%x(:)
+      !
+      dxco(:,npart,1)=pa%v
+      dxco(:,npart,2:ntime)=pa%dx(:,2:ntime)
       !
       if(npart==numparticle) exit
       !
     enddo
+    !
+    if (itimescheme.eq.1) then
+       !>>> Euler
+       xcor=gdt(itr)*dxco(:,:,1)+xcor
+       !
+    elseif(itimescheme.eq.2) then
+       !>>> Adam-Bashforth second order (AB2)
+       !
+       if(itime.eq.1 .and. irestart.eq.0) then
+         ! Do first time step with Euler
+         xcor=gdt(itr)*dxco(:,:,1)+xcor
+       else
+         xcor=adt(itr)*dxco(:,:,1)+bdt(itr)*dxco(:,:,2)+xcor
+       endif
+       dxco(:,:,2)=dxco(:,:,1)
+       !
+    elseif(itimescheme.eq.3) then
+       !>>> Adams-Bashforth third order (AB3)
+       !
+       ! Do first time step with Euler
+       if(itime.eq.1.and.irestart.eq.0) then
+          xcor=dt*dxco(:,:,1)+xcor
+       elseif(itime.eq.2.and.irestart.eq.0) then
+          ! Do second time step with AB2
+          xcor=onepfive*dt*dxco(:,:,1)-half*dt*dxco(:,:,2)+xcor
+          dxco(:,:,3)=dxco(:,:,2)
+       else
+          ! Finally using AB3
+          xcor=adt(itr)*dxco(:,:,1)+bdt(itr)*dxco(:,:,2)+cdt(itr)*dxco(:,:,3)+xcor
+          dxco(:,:,3)=dxco(:,:,2)
+       endif
+       dxco(:,:,2)=dxco(:,:,1)
+       !
+    elseif(itimescheme.eq.5) then
+       !>>> Runge-Kutta (low storage) RK3
+       if(itr.eq.1) then
+          xcor=gdt(itr)*dxco(:,:,1)+xcor
+       else
+          xcor=adt(itr)*dxco(:,:,1)+bdt(itr)*dxco(:,:,2)+xcor
+       endif
+       dxco(:,:,2)=dxco(:,:,1)
+       !
+    endif
+    ! !
+    ! put back from local array to particle array
+    npart=0
+    do jpart=1,psize
+      !
+      pa=>particle(jpart)
+      !
+      if(pa%new) cycle
+      !
+      npart=npart+1
+      !
+      pa%x(:)=xcor(:,npart)
+      !
+      pa%dx(:,2:ntime)=dxco(:,npart,2:ntime)
+      !
+      if(npart==numparticle) exit
+      !
+    enddo
+    !
+    deallocate(xcor,dxco)
     !
     call partical_domain_check
     !
@@ -677,27 +799,27 @@ module partack
       ! if the particle is out of domain, mark it and subscribe the 
       ! total number of particles
       !
-      if(nclx .and. (pa%x>xlx .or. pa%x<0)) then
+      if(nclx .and. (pa%x(1)>xlx .or. pa%x(1)<0)) then
         call pa%reset()
         npcanc=npcanc+1
         cycle
       endif
       !
-      if(ncly .and. (pa%y>yly .or. pa%y<0)) then
+      if(ncly .and. (pa%x(2)>yly .or. pa%x(2)<0)) then
         call pa%reset()
         npcanc=npcanc+1
         cycle
       endif
       !
-      if(nclz .and. (pa%z>zlz .or. pa%z<0)) then
+      if(nclz .and. (pa%x(3)>zlz .or. pa%x(3)<0)) then
         call pa%reset()
         npcanc=npcanc+1
         cycle
       endif
       !
-      if( pa%x>=lxmin(nrank) .and. pa%x<lxmax(nrank) .and. &
-          pa%y>=lymin(nrank) .and. pa%y<lymax(nrank) .and. &
-          pa%z>=lzmin(nrank) .and. pa%z<lzmax(nrank) ) then
+      if( pa%x(1)>=lxmin(nrank) .and. pa%x(1)<lxmax(nrank) .and. &
+          pa%x(2)>=lymin(nrank) .and. pa%x(2)<lymax(nrank) .and. &
+          pa%x(3)>=lzmin(nrank) .and. pa%x(3)<lzmax(nrank) ) then
         continue
       else
         !
@@ -709,9 +831,9 @@ module partack
           ! mark
           if(jrank==nrank) cycle
           !
-          if( pa%x>=lxmin(jrank) .and. pa%x<lxmax(jrank) .and. &
-              pa%y>=lymin(jrank) .and. pa%y<lymax(jrank) .and. &
-              pa%z>=lzmin(jrank) .and. pa%z<lzmax(jrank) ) then
+          if( pa%x(1)>=lxmin(jrank) .and. pa%x(1)<lxmax(jrank) .and. &
+              pa%x(2)>=lymin(jrank) .and. pa%x(2)<lymax(jrank) .and. &
+              pa%x(3)>=lzmin(jrank) .and. pa%x(3)<lzmax(jrank) ) then
             !
             pa%rank2go=jrank
             !
@@ -770,7 +892,7 @@ module partack
     !+------------+--------------------------------+
     integer :: pr(0:nproc-1,1:numparticle)
     type(partype),allocatable :: pa2send(:),pa2recv(:)
-    real(8) :: timebeg
+    real(8) :: timebeg,tvar1,tvar11,tvar2,tvar3,tvar4
     !
     timebeg=ptime()
     !
@@ -807,21 +929,16 @@ module partack
     !
     nsend_total=n
     !
+    tvar1=ptime()
+    count_time=count_time+tvar1-timebeg
+    !
     ! synchronize recv table according to send table
     nrecv=ptabupd(nsend)
     !
-    ! print*,' ** rank',nrank,' total number to send',nsend_total
+    tvar11=ptime()
     !
-    ! if(nrank==0) then
-    !   write(*,*)' ** rank',nrank,' to send ',nsend
-    !   !
-    !   do jrank=0,nproc-1
-    !     do jpart=1,nsend(jrank)
-    !       write(*,*)' ** jrank',jrank,'|',jpart,pr(jrank,jpart)
-    !     enddo
-    !   enddo
-    !   !
-    ! endif
+    table_share_time=table_share_time+tvar11-tvar1
+    !
     !
     ! to establish the buffer of storing particels about to send
     if(nsend_total>0) then
@@ -842,8 +959,6 @@ module partack
           call particle(p)%reset()
           !
           numparticle=numparticle-1
-          ! write(*,*)' **',n,' particle ',p,'-> rank',jrank
-          ! write(*,*)' **',n,' particle ',particle(p)%x
           !
         enddo
         !
@@ -851,9 +966,8 @@ module partack
       !
     endif 
     !
-    ! write(*,*)' ** rank',nrank,' n ',n,numparticle
-    !
-    ! write(*,*)' ** rank',nrank,' to recv ',nrecvtable
+    tvar2=ptime()
+    data_pack_time=data_pack_time+tvar2-tvar11
     !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! swap particle among ranks
@@ -862,6 +976,9 @@ module partack
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! end of swap particle among ranks
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !
+    tvar3=ptime()
+    mpi_comm_time=mpi_comm_time+tvar3-tvar2
     !
     ! now add the received particle in to the array, dynamically
     if(numparticle+msize(pa2recv)>psize) then
@@ -894,11 +1011,10 @@ module partack
     !
     numparticle=numparticle+n
     !
-    part_comm_time=part_comm_time+ptime()-timebeg
+    tvar4=ptime()
+    data_unpack_time=data_unpack_time+tvar4-tvar3
     !
-    ! print*,nrank,'|',numparticle
-    ! !
-    ! call mpistop
+    part_comm_time=part_comm_time+ptime()-timebeg
     !
   end subroutine partical_swap
   !+-------------------------------------------------------------------+
@@ -922,7 +1038,7 @@ module partack
     integer :: p,psize
     logical,save :: firstcal=.true.
     !
-    if(firstcal) then
+    if(firstcal .and. numparticle>0) then
       !
       write(rankname,'(i4.4)')nrank
       !
@@ -945,7 +1061,7 @@ module partack
       write(18,'(A)')'DATAPACKING=POINT'
       do p=1,psize
         if(particle(p)%new) cycle
-        write(18,'(3(1X,E15.7E3),1X,I0)')particle(p)%x,particle(p)%y,particle(p)%z,particle(p)%rankinn
+        write(18,'(3(1X,E15.7E3),1X,I0)')particle(p)%x(1),particle(p)%x(2),particle(p)%x(3),particle(p)%rankinn
       enddo
       close(18)
       print*,' << ./data/particle',rankname,'.dat'
@@ -1214,12 +1330,12 @@ module partack
     r8resv=0.d0
     !
     do jpart=1,nindsize
-      r8send(1,jpart)=datasend(jpart)%x
-      r8send(2,jpart)=datasend(jpart)%y
-      r8send(3,jpart)=datasend(jpart)%z
-      r8send(4,jpart)=datasend(jpart)%u
-      r8send(5,jpart)=datasend(jpart)%v
-      r8send(6,jpart)=datasend(jpart)%w
+      r8send(1,jpart)=datasend(jpart)%x(1)
+      r8send(2,jpart)=datasend(jpart)%x(2)
+      r8send(3,jpart)=datasend(jpart)%x(3)
+      r8send(4,jpart)=datasend(jpart)%v(1)
+      r8send(5,jpart)=datasend(jpart)%v(2)
+      r8send(6,jpart)=datasend(jpart)%v(3)
     enddo
     !
     call mpi_alltoallv(r8send, sendtabl, senddispls, newtype, &
@@ -1236,14 +1352,14 @@ module partack
         !
         call datarecv(jc)%init()
         !
-        datarecv(jc)%x=r8resv(1,jc)
-        datarecv(jc)%y=r8resv(2,jc)
-        datarecv(jc)%z=r8resv(3,jc)
-        datarecv(jc)%u=r8resv(4,jc)
-        datarecv(jc)%v=r8resv(5,jc)
-        datarecv(jc)%w=r8resv(6,jc)
+        datarecv(jc)%x(1)=r8resv(1,jc)
+        datarecv(jc)%x(2)=r8resv(2,jc)
+        datarecv(jc)%x(3)=r8resv(3,jc)
+        datarecv(jc)%v(1)=r8resv(4,jc)
+        datarecv(jc)%v(2)=r8resv(5,jc)
+        datarecv(jc)%v(3)=r8resv(6,jc)
         !
-        ! print*,nrank,'|',datarecv(jc)%x,datarecv(jc)%y,datarecv(jc)%z
+        ! print*,nrank,'|',datarecv(jc)%x(1),datarecv(jc)%x(2),datarecv(jc)%x(3)
         !
       enddo
     enddo
@@ -1300,7 +1416,7 @@ module partack
   !
   !+-------------------------------------------------------------------+
   !| The wraper of MPI_Wtime                                           |
-  !+-------------------------------------------------------------------+
+  !+-------------------------f------------------------------------------+
   !| CHANGE RECORD                                                     |
   !| -------------                                                     |
   !| 28-November-2019: Created by J. Fang @ STFC Daresbury Laboratory  |

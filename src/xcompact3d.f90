@@ -46,7 +46,7 @@ program xcompact3d
   use ibm_param
   use ibm, only : body
   use genepsi, only : genepsi3d
-  use partack,only : lpartack,partivelo
+  use partack,only : lpartack,particle_velo
 #ifdef DEBG 
   use tools, only : avg3d
 #endif
@@ -89,7 +89,7 @@ call init_xcompact3d()
         endif
         call calculate_transeq_rhs(drho1,dux1,duy1,duz1,dphi1,rho1,ux1,uy1,uz1,ep1,phi1,divu3)
         
-        if(lpartack) call partivelo(ux1,uy1,uz1)
+        if(lpartack) call particle_velo(ux1,uy1,uz1)
 
 #ifdef DEBG
         avg_param = zero
