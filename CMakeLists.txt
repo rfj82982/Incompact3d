@@ -137,6 +137,42 @@ else(ADIOS_FOUND)
   message(STATUS "ADIOS2 not found")
 endif()
 
+# SET HDF5
+set(HDF5_PREFER_PARALLEL TRUE)
+set(HDF5_DIR "/home/fangjian/opt/hdf5")
+find_package(HDF5 REQUIRED COMPONENTS Fortran HL)
+
+message(STATUS "HDF5_Fortran_COMPILER found: ${HDF5_Fortran_COMPILER_EXECUTABLE}")
+message(STATUS "HDF5_DIR: ${HDF5_DIR}")
+
+# Stop if there is no HDF5
+#if (HDF5_Fortran_COMPILER)
+#    message(STATUS "HDF5_Fortran_COMPILER found: ${HDF5_Fortran_COMPILER}")
+#else (HDF5_Fortran_COMPILER)
+#    message(SEND_ERROR "This application cannot compile without HDF5")
+#endif(HDF5_Fortran_COMPILER)
+
+# Warning if Include are not found => can be fixed with more recent cmake version
+if (HDF5_FOUND)
+    message(STATUS "HDF5 FOUND: ${HDF5_FOUND}")
+    include_directories(${HDF5_INCLUDE_DIRS})
+    message(STATUS "HDF5 INCL: ${HDF5_INCLUDE_DIRS}")
+    link_libraries(${HDF5_LIBRARIES})
+    message(STATUS "HDF5_LIB: ${HDF5_LIBRARIES}")
+    link_libraries(${HDF5_HL_LIBRARIES})
+    message(STATUS "HDF5_HL_LIB: ${HDF5_HL_LIBRARIES}")
+    link_libraries(${HDF5_Fortran_LIBRARIES})
+    message(STATUS "HDF5_Fortran_LIBRARIES: ${HDF5_Fortran_LIBRARIES}")
+    link_libraries(${HDF5_Fortran_HL_LIBRARIES})
+    message(STATUS "HDF5_Fortran_HL_LIBRARIES: ${HDF5_Fortran_HL_LIBRARIES}")
+    add_definitions("-DHDF5")
+else (HDF5_FOUND)
+    message(STATUS "NO HDF5 include have been found. The executable won't be targeted with HDF5 include")
+    message(STATUS "Code will compile but performaces can be compromised")
+    message(STATUS "Using a CMake vers > 3.10 should solve the problem")
+    message(STATUS "Alternatively use ccmake to manually set the include if available")
+endif (HDF5_FOUND)
+
 # Create a static library for the fft
 add_subdirectory(decomp2d)
 
@@ -160,6 +196,7 @@ if (${BUILD_TESTING})
   add_test(NAME Channel-Flow-Z COMMAND ${MPIEXEC_EXECUTABLE} -n ${MPIEXEC_MAX_NUMPROCS} ${CMAKE_INSTALL_PREFIX}/bin/xcompact3d input_test_z.i3d WORKING_DIRECTORY ${test_dir}/Channel-Flow-Z)
   if(NOT ${USE_ADIOS2})
     add_test(NAME Cylinder COMMAND ${MPIEXEC_EXECUTABLE} -n ${MPIEXEC_MAX_NUMPROCS} ${CMAKE_INSTALL_PREFIX}/bin/xcompact3d input_test.i3d WORKING_DIRECTORY ${test_dir}/Cylinder)
+    add_test(NAME CylinderMoving COMMAND ${MPIEXEC_EXECUTABLE} -n ${MPIEXEC_MAX_NUMPROCS} ${CMAKE_INSTALL_PREFIX}/bin/xcompact3d input_test_moving.i3d WORKING_DIRECTORY ${test_dir}/CylinderMoving)
   endif()
   add_test(NAME Lock-exchange COMMAND ${MPIEXEC_EXECUTABLE} -n ${MPIEXEC_MAX_NUMPROCS} ${CMAKE_INSTALL_PREFIX}/bin/xcompact3d input_test.i3d WORKING_DIRECTORY ${test_dir}/Lock-exchange)
   add_test(NAME Mixing-layer COMMAND ${MPIEXEC_EXECUTABLE} -n ${MPIEXEC_MAX_NUMPROCS} ${CMAKE_INSTALL_PREFIX}/bin/xcompact3d input_test.i3d WORKING_DIRECTORY ${test_dir}/Mixing-layer)

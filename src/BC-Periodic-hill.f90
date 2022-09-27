@@ -1,3 +1,7 @@
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!
 !!!        FILE: BC-Periodic-hill.f90
@@ -138,8 +142,7 @@ contains
 
     real(mytype) :: y,r,um,r3,x,z,h,ct
     real(mytype) :: cx0,cy0,cz0,hg,lg
-    integer :: k,j,i,fh,ierror,ii,is,code
-    integer (kind=MPI_OFFSET_KIND) :: disp
+    integer :: k,j,i,ierror,ii,is,code
 
     integer, dimension (:), allocatable :: seed
 

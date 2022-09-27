@@ -1,34 +1,6 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 module lockexch
 
@@ -65,9 +37,12 @@ module lockexch
 
   logical, save :: init = .FALSE.
 
+  character(len=*), parameter :: io_bcle = "BC-lock-exchange-io", &
+       bcle_dir = "data-lock-exchange"
+  
   private
   public :: init_lockexch, boundary_conditions_lockexch, postprocess_lockexch, &
-       pfront, set_fluid_properties_lockexch
+       pfront, set_fluid_properties_lockexch, visu_lockexch_init
 
 contains
 
@@ -269,6 +244,21 @@ contains
     return
   end subroutine init_lockexch
 
+  subroutine visu_lockexch_init(visu_initialised)
+
+    use decomp_2d, only : mytype
+    use decomp_2d_io, only : decomp_2d_register_variable
+    
+    implicit none
+
+    logical, intent(out) :: visu_initialised
+
+    call decomp_2d_register_variable(io_bcle, "dissm", 3, 0, 3, mytype)
+    call decomp_2d_register_variable(io_bcle, "dep", 2, 0, 2, mytype)
+
+    visu_initialised = .true.
+    
+  end subroutine visu_lockexch_init
 
   subroutine postprocess_lockexch(rho1,ux1,uy1,uz1,phi1,ep1) !By Felipe Schuch
 
@@ -591,16 +581,16 @@ contains
        !if (save_diss.eq.1) then
        uvisu=zero
        call fine_to_coarseV(1,diss1,uvisu)
-       write(filename,"('./data/diss',I4.4)") itime/ioutput
-       call decomp_2d_write_one(1,uvisu,filename,2)
+       write(filename,"('diss',I4.4)") itime/ioutput
+       call decomp_2d_write_one(1,uvisu,bcle_dir,filename,2,io_bcle)
        !endif
 
        !if (save_dissm.eq.1) then
        call transpose_x_to_y (diss1,temp2)
        call transpose_y_to_z (temp2,temp3)
        call mean_plane_z(temp3,zsize(1),zsize(2),zsize(3),temp3(:,:,1))
-       write(filename,"('./data/dissm',I4.4)") itime/ioutput
-       call decomp_2d_write_plane(3,temp3,3,1,filename)
+       write(filename,"('dissm',I4.4)") itime/ioutput
+       call decomp_2d_write_plane(3,temp3,3,1,bcle_dir,filename,io_bcle)
        !endif
     endif
 
@@ -636,8 +626,8 @@ contains
           end do
        end do
 
-       write(filename,"('./out/dep',I1.1,I4.4)") is,itime/iprocessing
-       call decomp_2d_write_plane(2,tempdep2(:,:,:,is),2,1,filename)
+       write(filename,"('dep',I1.1,I4.4)") is,itime/iprocessing
+       call decomp_2d_write_plane(2,tempdep2(:,:,:,is),2,1,bcle_dir,filename,io_bcle)
     enddo
 
   end subroutine dep

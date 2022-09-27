@@ -1,34 +1,6 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 module case
 
@@ -54,10 +26,12 @@ module case
 
   implicit none
 
+  logical :: case_visu_init = .false.
+  
   private ! All functions/subroutines private by default
   public :: init, boundary_conditions, &
             momentum_forcing, scalar_forcing, set_fluid_properties, &
-            test_flow, preprocessing, postprocessing, visu_case
+            test_flow, preprocessing, postprocessing, visu_case, visu_case_init
 
 contains
   !##################################################################
@@ -260,7 +234,7 @@ contains
 
     use turbine, only : turbine_output
     use probes, only : write_probes
-    use partack,only : lpartack,write_particle,ipartiout,numparticle, & 
+    use partack,only : lpartack,write_particle,h5write_particle,ipartiout,numparticle, & 
                         partile_inject,numpartix
 
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)), intent(in) :: ux1, uy1, uz1
@@ -286,11 +260,11 @@ contains
 
     if ((ivisu.ne.0).and.(mod(itime, ioutput).eq.0)) then
        call write_snapshot(rho1, ux1, uy1, uz1, pp3, T, ep1, itime, num)
-#ifndef ADIOS2
+
        ! XXX: Ultimate goal for ADIOS2 is to pass do all postproc online - do we need this?
        !      Currently, needs some way to "register" variables for IO
        call visu_case(rho1, ux1, uy1, uz1, pp3, T, ep1, num)
-#endif
+
        call end_snapshot(itime, num)
     end if
 
@@ -306,9 +280,10 @@ contains
 
     if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
       !
-      call write_particle()
-      ! !
-      ! call partile_inject(numpartix(1)*numpartix(2)*numpartix(3))
+      call h5write_particle(itime)
+      !
+      call partile_inject()
+      !
     endif
 
   end subroutine postprocessing
@@ -377,11 +352,49 @@ contains
     endif
 
     if (iforces.eq.1) then
-       call force(ux,uy,uz,ep)
+       call force(ux,uy,ep)
        call restart_forces(1)
     endif
 
   end subroutine postprocess_case
+  !##################################################################
+  !!
+  !!  SUBROUTINE: visu_case_init
+  !!      AUTHOR: PB
+  !! DESCRIPTION: Initialise case-specific visualization
+  !!
+  !##################################################################
+  subroutine visu_case_init
+
+    implicit none
+    
+    if (itype .eq. itype_tgv) then
+
+       call visu_tgv_init(case_visu_init)
+
+    else if (itype .eq. itype_channel) then
+
+       call visu_channel_init(case_visu_init)
+
+    else if (itype .eq. itype_cyl) then
+
+       call visu_cyl_init(case_visu_init)
+
+    else if (itype .eq. itype_tbl) then
+
+       call visu_tbl_init(case_visu_init)
+
+    else if (itype .eq. itype_lockexch) then
+
+       call visu_lockexch_init(case_visu_init)
+
+    else if (itype .eq. itype_uniform) then
+
+       call visu_uniform_init(case_visu_init)      
+
+    end if
+    
+  end subroutine visu_case_init
   !##################################################################
   !!
   !!  SUBROUTINE: visu_case
@@ -401,26 +414,46 @@ contains
     real(mytype), intent(in), dimension(xsize(1),xsize(2),xsize(3)) :: ep1
     character(len=32), intent(in) :: num
 
+    logical :: called_visu = .false.
+    
     if (itype.eq.itype_user) then
 
        call visu_user(ux1, uy1, uz1, pp3, phi1, ep1, num)
-
+       called_visu = .true.
+       
     elseif (itype.eq.itype_tgv) then
 
        call visu_tgv(ux1, uy1, uz1, pp3, phi1, ep1, num)
+       called_visu = .true.
 
     elseif (itype.eq.itype_channel) then
 
        call visu_channel(ux1, uy1, uz1, pp3, phi1, ep1, num)
+       called_visu = .true.
 
     elseif (itype.eq.itype_cyl) then
 
        call visu_cyl(ux1, uy1, uz1, pp3, phi1, ep1, num)
+       called_visu = .true.
 
     elseif (itype.eq.itype_tbl) then
 
        call visu_tbl(ux1, uy1, uz1, pp3, phi1, ep1, num)
+       called_visu = .true.
+       
+   elseif (itype.eq.itype_uniform) then
 
+       call visu_uniform(ux1, uy1, uz1, pp3, phi1, ep1, num)
+       called_visu = .true.
+
+    endif
+
+    if (called_visu .and. (.not. case_visu_init)) then
+
+       print *, "ERROR: tried to run case-specific visu without initialisation!"
+       print *, "       See the TGV case initialisation for example."
+       STOP
+       
     endif
 
   end subroutine visu_case

@@ -1,34 +1,7 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
+
 module channel
 
   use decomp_2d
@@ -43,7 +16,7 @@ module channel
 
   PRIVATE ! All functions/subroutines private by default
   PUBLIC :: init_channel, boundary_conditions_channel, postprocess_channel, &
-            visu_channel, momentum_forcing_channel, &
+            visu_channel, visu_channel_init, momentum_forcing_channel, &
             geomcomplex_channel
 
 contains
@@ -105,8 +78,9 @@ contains
     endif
 
     if (iscalar==1) then
-       if (nrank==0.and.(mod(itime, ilist) == 0 .or. itime == ifirst .or. itime == ilast)) &
+       if (nrank==0.and.(mod(itime, ilist) == 0 .or. itime == ifirst .or. itime == ilast)) then
           write(*,*) 'Imposing linear temperature profile'
+       end if
        do k=1,xsize(3)
           do j=1,xsize(2)
              if (istret==0) y=real(j+xstart(2)-2,mytype)*dy
@@ -130,6 +104,7 @@ contains
     ux1=zero
     uy1=zero
     uz1=zero
+    byx1=zero;byy1=zero;byz1=zero
     ! if to decide type of initialization to apply 
     if (iin == 0) then ! laminar flow
        do k=1,xsize(3)
@@ -400,6 +375,21 @@ contains
     real(mytype), intent(in), dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize,npress) :: pp3
 
   end subroutine postprocess_channel
+  subroutine visu_channel_init(visu_initialised)
+
+    use decomp_2d, only : mytype
+    use decomp_2d_io, only : decomp_2d_register_variable
+    use visu, only : io_name, output2D
+    
+    implicit none
+
+    logical, intent(out) :: visu_initialised
+
+    call decomp_2d_register_variable(io_name, "critq", 1, 0, output2D, mytype)
+
+    visu_initialised = .true.
+    
+  end subroutine visu_channel_init
   !############################################################################
   !!
   !!  SUBROUTINE: visu_channel
@@ -470,7 +460,7 @@ contains
                  - td1(:,:,:) * tb1(:,:,:) &
                  - tg1(:,:,:) * tc1(:,:,:) &
                  - th1(:,:,:) * tf1(:,:,:)
-    call write_field(di1, ".", "critq", trim(num))
+    call write_field(di1, ".", "critq", trim(num), flush = .true.) ! Reusing temporary array, force flush
 
   end subroutine visu_channel
   !############################################################################

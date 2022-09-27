@@ -31,6 +31,9 @@
 !################################################################################
 !    start particle tracking functionality by J Fang, 15/11/2021
 !################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 program xcompact3d
 
@@ -53,11 +56,8 @@ program xcompact3d
 
   implicit none
 
-#ifdef DEBG
-  real(mytype) avg_param
-#endif
 
-call init_xcompact3d()
+  call init_xcompact3d()
 
   do itime=ifirst,ilast
      !t=itime*dt
@@ -88,20 +88,14 @@ call init_xcompact3d()
           endif
         endif
         call calculate_transeq_rhs(drho1,dux1,duy1,duz1,dphi1,rho1,ux1,uy1,uz1,ep1,phi1,divu3)
+
         
         if(lpartack) call particle_velo(ux1,uy1,uz1)
 
 #ifdef DEBG
-        avg_param = zero
-        call avg3d (dux1, avg_param)
-        if (nrank == 0) write(*,*)'## Main dux1 ', avg_param
-        avg_param = zero
-        call avg3d (duy1, avg_param)
-        if (nrank == 0) write(*,*)'## Main duy1 ', avg_param
-        avg_param = zero
-        call avg3d (duz1, avg_param)
-        if (nrank == 0) write(*,*)'## Main duz1 ', avg_param
+        call check_transients()
 #endif
+        
         if (ilmn) then
            !! XXX N.B. from this point, X-pencil velocity arrays contain momentum (LMN only).
            call velocity_to_momentum(rho1,ux1,uy1,uz1)
@@ -141,6 +135,7 @@ subroutine init_xcompact3d()
 
   use MPI
   use decomp_2d
+  use decomp_2d_io, only : decomp_2d_io_init
   USE decomp_2d_poisson, ONLY : decomp_2d_poisson_init
   use case
   use sandbox, only : init_sandbox
@@ -151,7 +146,8 @@ subroutine init_xcompact3d()
   use navier, only : calc_divu_constraint
   use tools, only : test_speed_min_max, test_scalar_min_max, &
        restart, &
-       simu_stats, compute_cfldiff
+       simu_stats, compute_cfldiff, &
+       init_inflow_outflow
 
   use param, only : ilesmod, jles,itype
   use param, only : irestart
@@ -163,7 +159,7 @@ subroutine init_xcompact3d()
   use les, only: init_explicit_les
   use turbine, only: init_turbines
 
-  use visu, only : visu_init
+  use visu, only : visu_init, visu_ready
 
   use genepsi, only : genepsi3d, epsi_init
   use ibm, only : body
@@ -179,7 +175,7 @@ subroutine init_xcompact3d()
   integer :: nargin, FNLength, status, DecInd
   logical :: back
   character(len=80) :: InputFN, FNBase
-
+    
   !! Initialise MPI
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD,nrank,ierr)
@@ -216,6 +212,7 @@ subroutine init_xcompact3d()
   call parameter(InputFN)
 
   call decomp_2d_init(nx,ny,nz,p_row,p_col)
+  call decomp_2d_io_init()
   call init_coarser_mesh_statS(nstat,nstat,nstat,.true.)    !start from 1 == true
   call init_coarser_mesh_statV(nvisu,nvisu,nvisu,.true.)    !start from 1 == true
   call init_coarser_mesh_statP(nprobe,nprobe,nprobe,.true.) !start from 1 == true
@@ -253,7 +250,12 @@ subroutine init_xcompact3d()
 
   !####################################################################
   ! initialise visu
-  if (ivisu.ne.0) call visu_init()
+  if (ivisu.ne.0) then
+     call visu_init()
+     call visu_case_init() !! XXX: If you get error about uninitialised IO, look here.
+                           !! Ensures additional case-specific variables declared for IO
+     call visu_ready()
+  end if
   ! compute diffusion number of simulation
   call compute_cfldiff()
   !####################################################################
@@ -263,10 +265,15 @@ subroutine init_xcompact3d()
      call preprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
   else
      itr=1
-     ! call init_sandbox(ux1,uy1,uz1,ep1,phi1,1)
+     if (itype == itype_sandbox) then
+        call init_sandbox(ux1,uy1,uz1,ep1,phi1,1)
+     end if
      call restart(ux1,uy1,uz1,dux1,duy1,duz1,ep1,pp3(:,:,:,1),phi1,dphi1,px1,py1,pz1,rho1,drho1,mu1,0)
-!     ux1(:,:,:)=ux1(:,:,:)-0.5
   endif
+
+  if ((ioutflow.eq.1).or.(iin.eq.3)) then
+     call init_inflow_outflow()
+  end if
 
   if ((iibm.eq.2).or.(iibm.eq.3)) then
      call genepsi3d(ep1)
@@ -311,12 +318,14 @@ subroutine finalise_xcompact3d()
 
   use MPI
   use decomp_2d
+  use decomp_2d_io, only : decomp_2d_io_finalise
 
   use tools, only : simu_stats
-  use param, only : itype
+  use param, only : itype, jles, ilesmod
   use probes, only : finalize_probes
   use visu, only : visu_finalise
   use partack, only: lpartack,partcle_report
+  use les, only: finalise_explicit_les
 
   implicit none
 
@@ -339,7 +348,34 @@ subroutine finalise_xcompact3d()
   !
   call finalize_probes()
   call visu_finalise()
+  if (ilesmod.ne.0) then
+     if (jles.gt.0) call finalise_explicit_les()
+  endif
+  call decomp_2d_io_finalise()
   call decomp_2d_finalize
   CALL MPI_FINALIZE(ierr)
 
 endsubroutine finalise_xcompact3d
+
+subroutine check_transients()
+
+  use decomp_2d, only : mytype
+
+  use var
+  use tools, only : avg3d
+  
+  implicit none
+
+  real(mytype) avg_param
+  
+  avg_param = zero
+  call avg3d (dux1, avg_param)
+  if (nrank == 0) write(*,*)'## Main dux1 ', avg_param
+  avg_param = zero
+  call avg3d (duy1, avg_param)
+  if (nrank == 0) write(*,*)'## Main duy1 ', avg_param
+  avg_param = zero
+  call avg3d (duz1, avg_param)
+  if (nrank == 0) write(*,*)'## Main duz1 ', avg_param
+  
+end subroutine check_transients

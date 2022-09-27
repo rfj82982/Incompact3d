@@ -1,44 +1,64 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 module stats
 
   implicit none
 
+  character(len=*), parameter :: io_statistics = "statistics-io", &
+       stat_dir = "statistics"
+
+  integer :: stats_time
+  
   private
   public overall_statistic
 
 contains
 
+  subroutine init_statistic_adios2
+
+    use decomp_2d, only : mytype
+    use decomp_2d_io, only : decomp_2d_register_variable, decomp_2d_init_io
+
+    use var, only : numscalar
+    
+    implicit none
+
+    integer :: ierror
+    character(len=30) :: varname
+    integer :: is
+    logical, save :: initialised = .false.
+
+    if (.not. initialised) then
+       call decomp_2d_init_io(io_statistics)
+    
+       call decomp_2d_register_variable(io_statistics, "umean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "vmean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "wmean", 1, 1, 0, mytype)
+       
+       call decomp_2d_register_variable(io_statistics, "pmean", 1, 1, 0, mytype)
+       
+       call decomp_2d_register_variable(io_statistics, "uumean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "vvmean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "wwmean", 1, 1, 0, mytype)
+
+       call decomp_2d_register_variable(io_statistics, "uvmean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "uwmean", 1, 1, 0, mytype)
+       call decomp_2d_register_variable(io_statistics, "vwmean", 1, 1, 0, mytype)
+
+       do is=1, numscalar
+          write(varname,"('phi',I2.2)") is
+          call decomp_2d_register_variable(io_statistics, varname, 1, 1, 0, mytype)
+          write(varname,"('phiphi',I2.2)") is
+          call decomp_2d_register_variable(io_statistics, varname, 1, 1, 0, mytype)
+       enddo
+
+       initialised = .true.
+    endif
+       
+  end subroutine init_statistic_adios2
+  
   !
   ! Initialize to zero all statistics
   !
@@ -72,6 +92,8 @@ contains
       phiphimean = zero
     endif
 
+    call init_statistic_adios2
+
   end subroutine init_statistic
 
   !
@@ -80,17 +102,20 @@ contains
   subroutine restart_statistic
 
     use param, only : initstat, irestart, ifirst, zero
-    use variables, only : nvisu
+    use variables, only : nstat
     use var, only : tmean
 
     implicit none
 
-    ! No reading for statistics when nvisu > 1 or no restart
-    if (nvisu.gt.1 .or. irestart.eq.0) then
+    ! No reading for statistics when nstat > 1 or no restart
+    if (nstat.gt.1 .or. irestart.eq.0) then
        call init_statistic()
        initstat = ifirst
        return
+    else
+       call init_statistic_adios2
     endif
+
 
     ! Temporary array
     tmean = zero
@@ -100,6 +125,21 @@ contains
 
   end subroutine restart_statistic
 
+  function gen_statname(stat) result(newname)
+
+    implicit none
+    
+    character(len=*), intent(in) :: stat
+    character(len=30) :: newname
+    
+#ifndef ADIOS2
+    write(newname, "(A,'.dat',I7.7)") stat, stats_time
+#else
+    write(newname, *) stat
+#endif
+    
+  end function gen_statname
+
   !
   ! Statistics: perform all IO
   !
@@ -108,6 +148,8 @@ contains
     use param, only : iscalar, itime
     use variables, only : numscalar
     use decomp_2d, only : nrank
+    use decomp_2d_io, only : decomp_2d_write_mode, decomp_2d_read_mode, &
+         decomp_2d_open_io, decomp_2d_close_io, decomp_2d_start_io, decomp_2d_end_io
     use var, only : pmean
     use var, only : umean, uumean
     use var, only : vmean, vvmean
@@ -124,55 +166,63 @@ contains
     ! Local variables
     integer :: is, it
     character(len=30) :: filename
+    integer :: io_mode
+    integer :: ierror
+    
 
     ! File ID to read or write
     if (flag_read) then
         it = itime - 1
     else
         it = itime
-    endif
+     endif
+     stats_time = it
 
     if (nrank==0) then
       print *,'==========================================================='
       if (flag_read) then
-        print *,'Reading stat file', it
+        print *,'Reading stat file', stats_time
       else
-        print *,'Writing stat file', it
+        print *,'Writing stat file', stats_time
       endif
     endif
 
-    write(filename,"('pmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, pmean)
-    write(filename,"('umean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, umean)
-    write(filename,"('vmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, vmean)
-    write(filename,"('wmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, wmean)
+    if (flag_read) then
+       io_mode = decomp_2d_read_mode
+    else
+       io_mode = decomp_2d_write_mode
+    endif
+#ifdef ADIOS2
+    call decomp_2d_open_io(io_statistics, stat_dir, io_mode)
+    call decomp_2d_start_io(io_statistics, stat_dir)
+#endif
+    
+    call read_or_write_one_stat(flag_read, gen_statname("pmean"), pmean)
+    call read_or_write_one_stat(flag_read, gen_statname("umean"), umean)
+    call read_or_write_one_stat(flag_read, gen_statname("vmean"), vmean)
+    call read_or_write_one_stat(flag_read, gen_statname("wmean"), wmean)
 
-    write(filename,"('uumean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, uumean)
-    write(filename,"('vvmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, vvmean)
-    write(filename,"('wwmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, wwmean)
+    call read_or_write_one_stat(flag_read, gen_statname("uumean"), uumean)
+    call read_or_write_one_stat(flag_read, gen_statname("vvmean"), vvmean)
+    call read_or_write_one_stat(flag_read, gen_statname("wwmean"), wwmean)
 
-    write(filename,"('uvmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, uvmean)
-    write(filename,"('uwmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, uwmean)
-    write(filename,"('vwmean.dat',I7.7)") it
-    call read_or_write_one_stat(flag_read, filename, vwmean)
+    call read_or_write_one_stat(flag_read, gen_statname("uvmean"), uvmean)
+    call read_or_write_one_stat(flag_read, gen_statname("uwmean"), uwmean)
+    call read_or_write_one_stat(flag_read, gen_statname("vwmean"), vwmean)
 
     if (iscalar==1) then
        do is=1, numscalar
-          write(filename,"('phi',I2.2,'mean.dat',I7.7)") is, it
-          call read_or_write_one_stat(flag_read, filename, phimean(:,:,:,is))
-          write(filename,"('phiphi',I2.2,'mean.dat',I7.7)") is, it
-          call read_or_write_one_stat(flag_read, filename, phiphimean(:,:,:,is))
+          call read_or_write_one_stat(flag_read, gen_statname(filename), phimean(:,:,:,is))
+          write(filename,"('phiphi',I2.2)") is
+          call read_or_write_one_stat(flag_read, gen_statname(filename), phiphimean(:,:,:,is))
        enddo
     endif
 
+#ifdef ADIOS2
+    call decomp_2d_end_io(io_statistics, stat_dir)
+    call decomp_2d_close_io(io_statistics, stat_dir)
+#endif
+    
     if (nrank==0) then
       if (flag_read) then
         print *,'Read stat done!'
@@ -198,12 +248,13 @@ contains
     logical, intent(in) :: flag_read
     character(len=*), intent(in) :: filename
     real(mytype), dimension(xstS(1):xenS(1),xstS(2):xenS(2),xstS(3):xenS(3)), intent(inout) :: array
+    integer :: ierror
 
     if (flag_read) then
-      ! There was a check for nvisu = 1 before
-      call decomp_2d_read_one(1, array, filename)
+       ! There was a check for nvisu = 1 before
+       call decomp_2d_read_one(1, array, stat_dir, filename, io_statistics, reduce_prec=.false.)
     else
-      call decomp_2d_write_one(1, array, filename, 1)
+       call decomp_2d_write_one(1, array, stat_dir, filename, 1, io_statistics, reduce_prec=.false.)
     endif
 
   end subroutine read_or_write_one_stat
@@ -249,7 +300,7 @@ contains
     elseif (itime.eq.initstat) then
        call init_statistic()
     elseif (itime.eq.ifirst) then
-        call restart_statistic()
+       call restart_statistic()
     endif
 
     !! Mean pressure
@@ -379,210 +430,3 @@ contains
 
 endmodule stats
 
-! !############################################################################
-! subroutine CONVERGENCE_STATISTIC(ux1,ep1,u1sum_tik,u1sum_tak,tsum)
-
-!   USE param
-!   USE variables
-!   USE decomp_2d
-!   USE decomp_2d_io
-
-!   implicit none
-
-!   real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,ep1
-!   real(mytype),dimension(xszS(1),xszS(2),xszS(3)) :: u1sum_tik,u1sum_tak,tsum
-!   character(len=30) :: filename
-
-!   if (iibm.ne.0) then
-!      call fine_to_coarseS(1,(1-ep1)*ux1,tsum)
-!   else
-!      call fine_to_coarseS(1,ux1,tsum)
-!   endif
-
-!   u1sum_tik=u1sum_tik+tsum
-
-!   if (mod(itime,ntik)==0) then
-!      if (nrank.eq.0) print *,'Saving uxmean tik =>',(itime/(ntik/2)-1)
-!      write(filename,"('uxmean',I4.4)") (itime/(ntik/2)-1)
-!      call decomp_2d_write_one(1,u1sum_tik/ntik,filename,1)
-!      u1sum_tik = zero
-!   endif
-
-!   if (itime.ge.(ntik/2)) then
-
-!      u1sum_tak=u1sum_tak+tsum
-
-!      if (itime.gt.(ntik/2).AND.mod(itime+ntik/2,ntik)==0) then
-!         if (nrank.eq.0) print *,'Saving uxmean tak =>',(itime/(ntik/2)-1)
-!         write(filename,"('uxmean',I4.4)") (itime/(ntik/2) -1)
-!         call decomp_2d_write_one(1,u1sum_tak/ntik,filename,1)
-!         u1sum_tak = zero
-!      endif
-
-!   endif
-
-! end subroutine CONVERGENCE_STATISTIC
-! !############################################################################
-! subroutine CONVERGENCE_STATISTIC2(ux1,ep1,tik1,tik2,tak1,tak2)
-
-!   USE param
-!   USE variables
-!   USE decomp_2d
-!   USE decomp_2d_io
-
-!   implicit none
-
-!   real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,ep1
-!   real(mytype),dimension(xszS(1),xszS(2),xszS(3)) :: tik1,tik2,tak1,tak2,tsum
-!   real(mytype) :: rms1
-!   character(len=30) :: filename
-
-!   rms1 = zero
-
-!   if (iibm.ne.0) then
-!      call fine_to_coarseS(1,(1-ep1)*ux1,tsum)
-!   else
-!      call fine_to_coarseS(1,ux1,tsum)
-!   endif
-
-!   tik1 = tik1 + tsum
-!   tak1 = tak1 + tsum
-
-!   if (mod(itime,ntik)==0) then
-!      tik2 = tik1/ntik
-!      tik1 = zero
-!   end if
-
-!   if (itime.eq.(ntik/2.)) tak1 = zero
-
-!   if ((itime.gt.(ntik/2.)).AND.(mod(itime+ntik/2,ntik)==0)) then
-!      tak2 = tak1/ntik
-!      tak1 = zero
-!   end if
-
-!   if (itime.ge.(int((3./2.)*ntik))) then
-
-!      if ((mod(itime,ntik)==0).OR.(mod(itime+ntik/2,ntik)==0)) then
-
-!         call RMS(tik2,tak2,rms1)
-
-!         if (nrank .eq. 0) then
-
-!            print *,'RMS=',rms1
-
-!            write(filename,"('rms',I8.8)") itime
-!            open(67,file=trim(filename),status='unknown',form='formatted')
-!            write(67,"(2E14.6,I14)") t,rms1,itime
-!            close(67)
-
-!            rms1=zero
-
-!         end if
-!      endif
-!   end if
-
-! end subroutine CONVERGENCE_STATISTIC2
-! !############################################################################
-! subroutine RMS(meanA,meanB,rms1)
-
-!   USE param
-!   USE variables
-!   USE decomp_2d
-!   USE MPI
-
-!   implicit none
-
-!   real(mytype),dimension(xszS(1),xszS(2),xszS(3)) :: meanA, meanB
-!   real(mytype) :: rms0,rms1
-!   character(len=30) :: filename
-!   integer :: i,j,k,code
-
-!   rms1 = zero
-!   do k = 1, xszS(3)
-!      do j = 1, xszS(2)
-!         do i = 1, xszS(1)
-!            rms1=rms1+(meanB(i,j,k)-meanA(i,j,k))**2
-!         enddo
-!      enddo
-!   enddo
-
-!   rms0 = zero
-!   rms0 = sqrt(rms1/(nx*ny*nz))
-!   rms1 = zero
-
-!   call MPI_REDUCE(rms0,rms1,1,real_type,MPI_SUM,0,MPI_COMM_WORLD,code)
-!   return
-
-! end subroutine RMS
-! !############################################################################
-! subroutine EXTRA_STAT (ux1,uy1,uz1,uvisu,tsum,dudxsum,utmapsum)
-
-!   USE param
-!   USE variables
-!   USE decomp_2d
-!   USE decomp_2d_io
-
-!   implicit none
-
-!   real(mytype),intent(in),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1
-!   real(mytype),dimension(xszV(1),xszV(2),xszV(3)) :: uvisu,tsum,dudxsum,utmapsum
-
-!   real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ta1,td1,tf1,di1 !ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,phim1,temp1
-!   real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: ta2,tc2,td2,tf2 !ta2,tb2,tc2,td2,te2,tf2,tg2,th2,ti2,tj2,phim2,di2,temp2
-!   !real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: !ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3,phim3,temp3
-
-
-
-!   !x-derivatives
-!   call derx (ta1,ux1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0)
-!   !call derx (tb1,uy1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1)
-!   !call derx (tc1,uz1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1)
-!   !y-derivatives
-!   call transpose_x_to_y(ux1,td2)
-!   !call transpose_x_to_y(uy1,te2)
-!   call transpose_x_to_y(uz1,tf2)
-!   call dery (ta2,td2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)
-!   !call dery (tb2,te2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
-!   call dery (tc2,tf2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)
-!   !!z-derivatives
-!   !call transpose_y_to_z(td2,td3)
-!   !call transpose_y_to_z(te2,te3)
-!   !call transpose_y_to_z(tf2,tf3)
-!   !call derz (ta3,td3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1)
-!   !call derz (tb3,te3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1)
-!   !call derz (tc3,tf3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0)
-!   !!all back to x-pencils
-!   !call transpose_z_to_y(ta3,td2)
-!   !call transpose_z_to_y(tb3,te2)
-!   !call transpose_z_to_y(tc3,tf2)
-!   !call transpose_y_to_x(td2,tg1)
-!   !call transpose_y_to_x(te2,th1)
-!   !call transpose_y_to_x(tf2,ti1)
-!   call transpose_y_to_x(ta2,td1)
-!   !call transpose_y_to_x(tb2,te1)
-!   call transpose_y_to_x(tc2,tf1)
-!   !du/dx=ta1 du/dy=td1 and du/dz=tg1
-!   !dv/dx=tb1 dv/dy=te1 and dv/dz=th1
-!   !dw/dx=tc1 dw/dy=tf1 and dw/dz=ti1
-
-
-!   !FIRST DERIVATIVE
-!   call fine_to_coarseS(1,ta1,tsum)
-!   dudxsum = dudxsum + tsum
-!   if (mod(itime,imodulo)==0) then
-!      call decomp_2d_write_one(1,dudx,'dudx.sum',1)
-!   endif
-
-!   !FRICTION VELOCITY OVER ITERATION
-!   di1 = zero
-!   di1 = sqrt(sqrt( td1**2 + tf1**2 )*xnu) !du/dy**2 + dw/dy**2
-
-!   call fine_to_coarseS(1,ta1,tsum)
-!   utmapsum=utmapsum+tsum
-!   if (mod(itime,imodulo)==0) then
-!      call decomp_2d_write_plane(1,utmapsum,2,1,'utmap.sum')
-!   endif
-
-
-
-! end subroutine EXTRA_STAT

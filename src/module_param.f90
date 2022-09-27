@@ -1,34 +1,7 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
+
 module variables
   !USE param
   !USE var
@@ -53,7 +26,7 @@ module variables
   !Possible n points: 3 5 7 9 11 13 17 19 21 25 31 33 37 41 49 51 55 61 65 73 81 91 97 101 109 121 129 145 151 161 163 181 193 201 217 241 251 257 271 289 301 321 325 361 385 401 433 451 481 487 501 513 541 577 601 641 649 721 751 769 801 811 865 901 961 973 1001 1025 1081 1153 1201 1251 1281 1297 1351 1441 1459 1501 1537 1601 1621 1729 1801 1921 1945 2001 2049 2161 2251 2305 2401 2431 2501 2561 2593 2701 2881 2917 3001 3073 3201 3241 3457 3601 3751 3841 3889 4001 4051 4097 4321 4375 4501 4609 4801 4861 5001 5121 5185 5401 5761 5833 6001 6145 6251 6401 6481 6751 6913 7201 7291 7501 7681 7777 8001 8101 8193 8641 8749 9001 9217 9601 9721 enough
 
   integer :: nx,ny,nz,numscalar,p_row,p_col,nxm,nym,nzm,spinup_time
-  integer :: nstat=1,nvisu=1,nprobe=1,nlength=1,ilist=1
+  integer :: nstat=1,nvisu=1,nprobe=1,nlength=1,ilist=25
 
   real(mytype),allocatable,dimension(:) :: sc,uset,cp,ri,group
   real(mytype) :: nu0nu, cnu
@@ -328,7 +301,7 @@ module param
   real(mytype) :: wrotation,ro
   real(mytype) :: dens1, dens2
   real(mytype) :: C_filter
-  character(len=100) :: inflowpath
+  character(len=512) :: inflowpath
 
   ! Logical, true when synchronization is needed
   logical, save :: sync_vel_needed = .true.
@@ -398,9 +371,7 @@ module param
   real(mytype) :: C_T, aind
   ! Actuator line
   integer :: NTurbines, NActuatorlines
-  integer :: ialmrestart
   character, dimension(100) :: TurbinesPath*80, ActuatorlinesPath*80
-  character(len=100) :: filealmrestart
   real(mytype) :: eps_factor ! Smoothing factor
   
   !! Case-specific variables
@@ -512,7 +483,7 @@ module param
   !
   real(mytype),parameter :: onethousand=1000._mytype
   real(mytype),parameter :: twothousand=2000._mytype
-  real(mytype),parameter :: thirtysixthousand=3600._mytype
+  real(mytype),parameter :: threethousandsixhundred=3600._mytype
   !
   complex(mytype),parameter :: cx_one_one=cmplx(one, one, kind=mytype)
 

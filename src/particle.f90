@@ -9,6 +9,8 @@
 module partack
   !
   use decomp_2d, only : mytype,nrank,nproc
+  use hdf5
+  use h5lt
   !
   implicit none
   !
@@ -29,6 +31,7 @@ module partack
   !
   interface ptabupd
     module procedure ptable_update_int_arr
+    module procedure updatable_int
   end interface ptabupd
   !
   interface pa2a
@@ -39,6 +42,17 @@ module partack
      module procedure extend_particle
   end interface mextend
   !
+  Interface h5write
+    !
+    module procedure h5wa_r8
+    module procedure h5w_real8
+    module procedure h5w_int4
+    !
+  end Interface h5write
+  !
+  interface pgather
+    module procedure pgather_int
+  end interface
   ! particles
   type partype
     !
@@ -89,6 +103,9 @@ module partack
   !|            uy_pa |                                            |
   !|            uz_pa | velocity of particles                      |
   !+------------------+--------------------------------------------+
+  !
+  integer(hid_t) :: h5file_id
+  integer :: mpi_comm_particle,mpi_rank_part,mpi_size_part
   !
   contains
   !
@@ -185,6 +202,69 @@ module partack
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
+  !| This subroutine is to generate particle array.                    |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 28-06-2022  | Created by J. Fang                                  |
+  !+-------------------------------------------------------------------+
+  subroutine particle_gen(particle_new,particle_size)
+    !
+    ! arguments
+    type(partype),intent(out),allocatable :: particle_new(:)
+    integer,intent(out) :: particle_size
+    !
+    ! local data
+    integer :: p,i,j,k,max_part_size
+    real(8) :: dx,dy,dz,x,y,z
+    !
+    p=0
+    !
+    max_part_size=numpartix(1)*numpartix(2)*numpartix(3)
+    allocate(particle_new(1:max_part_size))
+    !
+    do k=1,numpartix(3)
+    do j=1,numpartix(2)
+    do i=1,numpartix(1)
+      !
+      dx=(partirange(2)-partirange(1))/real(numpartix(1),mytype)
+      dy=(partirange(4)-partirange(3))/real(numpartix(2),mytype)
+      dz=(partirange(6)-partirange(5))/real(numpartix(3),mytype)
+      !
+      x=dx*real(i,mytype)+partirange(1)
+      y=dy*real(j,mytype)+partirange(3)
+      z=dz*real(k,mytype)+partirange(5)
+      !
+      if( x>=lxmin(nrank) .and. x<lxmax(nrank) .and. &
+          y>=lymin(nrank) .and. y<lymax(nrank) .and. &
+          z>=lzmin(nrank) .and. z<lzmax(nrank) ) then
+        !
+        p=p+1
+        !
+        call particle_new(p)%init()
+        !
+        particle_new(p)%x(1)=x
+        particle_new(p)%x(2)=y
+        particle_new(p)%x(3)=z
+        !
+        particle_new(p)%new=.false.
+        !
+      endif
+      !
+    enddo
+    enddo
+    enddo
+    !
+    call mclean(particle_new,p)
+    !
+    particle_size=p
+    !
+  end subroutine particle_gen
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine particle_gen.                           |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
   !| This subroutine is to initilise particle positions.               |
   !+-------------------------------------------------------------------+
   !| CHANGE RECORD                                                     |
@@ -194,77 +274,20 @@ module partack
   subroutine init_particle
     !
     use param,     only : xlx,yly,zlz
+    use var,       only : itime
     !
     ! local data
     integer :: i,j,k,p
-    integer :: big_num
     real(mytype) :: dx,dy,dz
     !
+    call particle_gen(particle,numparticle)
     !
-    p=0
+    ! call partical_domain_check
+    ! !
+    ! call partical_swap
     !
-    if(nrank==0) then
-      !
-      numparticle=numpartix(1)*numpartix(2)*numpartix(3)
-      allocate(particle(1:numparticle))
-      !
-      do k=1,numpartix(3)
-      do j=1,numpartix(2)
-      do i=1,numpartix(1)
-        !
-        dx=(partirange(2)-partirange(1))/real(numpartix(1),mytype)
-        dy=(partirange(4)-partirange(3))/real(numpartix(2),mytype)
-        dz=(partirange(6)-partirange(5))/real(numpartix(3),mytype)
-        !
-        p=p+1
-        !
-        call particle(p)%init()
-        !
-        particle(p)%x(1)=dx*real(i,mytype)+partirange(1)
-        particle(p)%x(2)=dy*real(j,mytype)+partirange(3)
-        particle(p)%x(3)=dz*real(k,mytype)+partirange(5)
-        !
-        particle(p)%new=.false.
-        !
-      enddo
-      enddo
-      enddo
-      !
-      ! numparticle=p
-      ! !
-      ! call mclean(particle,numparticle)
-      !
-    endif
-    !
-    ! p=0
-    ! do k=1,numpartix(3)
-    ! do j=1,numpartix(2)
-    ! do i=1,numpartix(1)
-    !   !
-    !   dy=(lymax(nrank)-lymin(nrank))/real(numpartix(2),mytype)
-    !   dz=(lzmax(nrank)-lzmin(nrank))/real(numpartix(3),mytype)
-    !   !
-    !   p=p+1
-    !   !
-    !   particle(p)%x(1)=0.0001d0
-    !   !
-    !   particle(p)%x(2)=dy*real(j,mytype)+lymin(nrank)-0.5d0*dy
-    !   particle(p)%x(3)=dz*real(k,mytype)+lzmin(nrank)-0.5d0*dz
-    !   !
-    !   particle(p)%rankinn=nrank
-    !   !
-    !   particle(p)%out=.false.
-    !   particle(p)%swap=.false.
-    !   !
-    ! enddo
-    ! enddo
-    ! enddo
-    !
-    call partical_domain_check
-    !
-    call partical_swap
-    !
-    call write_particle()
+    ! call write_particle()
+    call h5write_particle(0)
     !
     part_time=0.d0
     part_comm_time=0.d0
@@ -276,7 +299,6 @@ module partack
     data_pack_time=0.d0
     data_unpack_time=0.d0
     mpi_comm_time=0.d0
-    ! call mpistop
     !
   end subroutine init_particle
   !+-------------------------------------------------------------------+
@@ -290,56 +312,24 @@ module partack
   !| -------------                                                     |
   !| 17-11-2021  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine partile_inject(numadd)
+  subroutine partile_inject
     !
     use param,     only : xlx,yly,zlz
     !
-    integer,intent(in) :: numadd
     !
     ! local data
-    real(mytype),allocatable,dimension(:) :: xpa_add,ypa_add,zpa_add
-    real(mytype),allocatable,dimension(:) :: ux_pa_add,uy_pa_add,uz_pa_add
-    integer :: i,j,k,p
+    type(partype),allocatable :: particle_new(:)
+    integer :: num_new_particle,n
     !
-    allocate(xpa_add(numparticle+numadd),ypa_add(numparticle+numadd),  &
-             zpa_add(numparticle+numadd),ux_pa_add(numparticle+numadd),&
-             uy_pa_add(numparticle+numadd),uz_pa_add(numparticle+numadd))
+    call particle_gen(particle_new,num_new_particle)
     !
-    xpa_add(1:numparticle)=xpa(1:numparticle)
-    ypa_add(1:numparticle)=ypa(1:numparticle)
-    zpa_add(1:numparticle)=zpa(1:numparticle)
+    call particle_add(particle,particle_new,n)
     !
-    ux_pa_add(1:numparticle)=ux_pa(1:numparticle)
-    uy_pa_add(1:numparticle)=uy_pa(1:numparticle)
-    uz_pa_add(1:numparticle)=uz_pa(1:numparticle)
+    numparticle=numparticle+n
     !
-    p=numparticle
-    do k=1,numpartix(3)
-    do j=1,numpartix(2)
-    do i=1,numpartix(1)
-      !
-      p=p+1
-      !
-      xpa_add(p)=(partirange(2)-partirange(1))/real(numpartix(1),mytype)*  &
-                 real(i,mytype)+partirange(1)
-      ypa_add(p)=(partirange(4)-partirange(3))/real(numpartix(2),mytype)*  &
-                  real(j,mytype)+partirange(3)
-      zpa_add(p)=(partirange(6)-partirange(5))/real(numpartix(3),mytype)*  &
-                 real(k,mytype)+partirange(5)
-    enddo
-    enddo
-    enddo
+    call partical_domain_check
     !
-    deallocate(xpa,ypa,zpa,ux_pa,uy_pa,uz_pa)
-    !
-    call move_alloc(xpa_add, xpa)
-    call move_alloc(ypa_add, ypa)
-    call move_alloc(zpa_add, zpa)
-    call move_alloc(ux_pa_add, ux_pa)
-    call move_alloc(uy_pa_add, uy_pa)
-    call move_alloc(uz_pa_add, uz_pa)
-    !
-    numparticle=numparticle+numadd
+    call partical_swap
     !
   end subroutine partile_inject
   !+-------------------------------------------------------------------+
@@ -652,7 +642,8 @@ module partack
     use param
     !
     ! local data 
-    integer :: p,psize,jpart,npart
+    integer :: p,psize,jpart,npart,total_num_part
+    integer,save :: old_num_part=0
     type(partype),pointer :: pa
     real(8) :: timebeg
     !
@@ -753,6 +744,16 @@ module partack
     !
     part_time=part_time+ptime()-timebeg
     !
+    total_num_part=psum(numparticle)
+    !
+    if(nrank==0) then
+      if(total_num_part.ne.old_num_part) then
+        print*,' ** number of particles changes from ',old_num_part,'->',total_num_part
+      endif
+      old_num_part=total_num_part
+    endif
+    ! print*,nrank,'| number of particles:',numparticle
+    ! !
     ! call mpistop
     !
     ! if(nrank==0) then
@@ -778,7 +779,7 @@ module partack
     use param,     only : nclx,ncly,nclz,xlx,yly,zlz
     !
     ! local data 
-    integer :: jpart,npart,psize,jrank,npcanc
+    integer :: jpart,npart,psize,jrank,npcanc,npcanc_totl
     type(partype),pointer :: pa
     real(8) :: timebeg
     !
@@ -849,15 +850,19 @@ module partack
     !
     numparticle=numparticle-npcanc
     !
+    npcanc_totl=psum(npcanc)
+    if(nrank==0 .and. npcanc_totl>0) print*,' ** ',npcanc_totl,        &
+                                   ' particles are moving out of domain'
+    !
     part_dmck_time=part_dmck_time+ptime()-timebeg
     ! print*,nrank,'|',numparticle
-    ! do p=1,psize
+    ! do jpart=1,psize
     !   !
-    !   pa=>particle(p)
+    !   pa=>particle(jpart)
     !   !
     !   if(pa%swap) then
     !     !
-    !     write(*,'(3(A,1X,I0))')' ** particle',p,' moves from rank', &
+    !     write(*,'(3(A,1X,I0))')' ** particle',jpart,' moves from rank', &
     !                                  pa%rankinn,' to rank',pa%rank2go
     !     !
     !   endif
@@ -932,6 +937,12 @@ module partack
     tvar1=ptime()
     count_time=count_time+tvar1-timebeg
     !
+    ! do jrank=0,nproc-1
+    !   if(nsend(jrank)>0) then
+    !     print*,' **',nsend(jrank),'particles is moving ',nrank,'->',jrank
+    !   endif
+    ! enddo
+    !
     ! synchronize recv table according to send table
     nrecv=ptabupd(nsend)
     !
@@ -980,35 +991,42 @@ module partack
     tvar3=ptime()
     mpi_comm_time=mpi_comm_time+tvar3-tvar2
     !
+    call particle_add(particle,pa2recv,n)
+    !
+    ! do jrank=0,nproc-1
+    !   if(n>0) then
+    !     print*,nrank,'| add ',n,'particles'
+    !   endif
+    ! enddo
     ! now add the received particle in to the array, dynamically
-    if(numparticle+msize(pa2recv)>psize) then
-      !
-      ! expand the particle array
-      newsize=max(numparticle+msize(pa2recv),numparticle+100)
-      !
-      call mextend(particle,newsize)
-      !
-    endif
-    !
-    n=0
-    do jpart=1,msize(particle)
-      !
-      pa=>particle(jpart)
-      !
-      ! the particle is free for re-assigning
-      if(pa%new) then
-        !
-        if(n>=msize(pa2recv)) exit
-        !
-        n=n+1
-        !
-        pa=pa2recv(n)
-        pa%new=.false.
-        !
-      endif
-      !
-    enddo
-    !
+    ! if(numparticle+msize(pa2recv)>psize) then
+    !   !
+    !   ! expand the particle array
+    !   newsize=max(numparticle+msize(pa2recv),numparticle+100)
+    !   !
+    !   call mextend(particle,newsize)
+    !   !
+    ! endif
+    ! !
+    ! n=0
+    ! do jpart=1,msize(particle)
+    !   !
+    !   pa=>particle(jpart)
+    !   !
+    !   ! the particle is free for re-assigning
+    !   if(pa%new) then
+    !     !
+    !     if(n>=msize(pa2recv)) exit
+    !     !
+    !     n=n+1
+    !     !
+    !     pa=pa2recv(n)
+    !     pa%new=.false.
+    !     !
+    !   endif
+    !   !
+    ! enddo
+    ! !
     numparticle=numparticle+n
     !
     tvar4=ptime()
@@ -1019,6 +1037,67 @@ module partack
   end subroutine partical_swap
   !+-------------------------------------------------------------------+
   ! The end of the subroutine partical_swap                            |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is to add particles to the current particle arrary|
+  !+-------------------------------------------------------------------+
+  !| tecplot format for now                                            |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 28-06-2022  | Created by J. Fang                                  |
+  !+-------------------------------------------------------------------+
+  subroutine particle_add(particle_cur,particle_new,num_part_incr)
+    !
+    ! arguments
+    type(partype),intent(inout),allocatable,target :: particle_cur(:)
+    type(partype),intent(in),allocatable :: particle_new(:)
+    integer,intent(out) :: num_part_incr
+    !
+    ! local data
+    integer :: psize,newsize,n,jpart
+    type(partype),pointer :: pa
+    !
+    psize=msize(particle_cur)
+    !
+    ! now add the received particle in to the array, dynamically
+    if(numparticle+msize(particle_new)>psize) then
+      !
+      ! expand the particle array
+      newsize=max(numparticle+msize(particle_new),numparticle+100)
+      !
+      call mextend(particle_cur,newsize)
+      !
+      psize=newsize
+    endif
+    !
+    n=0
+    do jpart=1,psize
+      !
+      ! print*,nrank,'|',jpart
+      pa=>particle_cur(jpart)
+      !
+      ! the particle is free for re-assigning
+      if(pa%new) then
+        !
+        if(n>=msize(particle_new)) exit
+        !
+        n=n+1
+        !
+        pa=particle_new(n)
+        pa%new=.false.
+        !
+      endif
+      !
+    enddo
+    !
+    ! print*,nrank,'|',n,newsize
+    num_part_incr=n
+    !
+  end subroutine particle_add
+  !+-------------------------------------------------------------------+
+  ! The end of the subroutine particle_add                             |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -1035,7 +1114,7 @@ module partack
     use param, only : t
     !
     ! local data
-    integer :: p,psize
+    integer :: p,psize,total_num_part
     logical,save :: firstcal=.true.
     !
     if(firstcal .and. numparticle>0) then
@@ -1064,14 +1143,92 @@ module partack
         write(18,'(3(1X,E15.7E3),1X,I0)')particle(p)%x(1),particle(p)%x(2),particle(p)%x(3),particle(p)%rankinn
       enddo
       close(18)
-      print*,' << ./data/particle',rankname,'.dat'
+      ! print*,' << ./data/particle',rankname,'.dat'
     endif
+    !
+    total_num_part=psum(numparticle)
+    !
+    if(nrank==0) print*,' ** total number of particles is:',total_num_part
+    ! print*,nrank,'| number of particles:',numparticle
     !
   end subroutine write_particle
   !+-------------------------------------------------------------------+
   ! The end of the subroutine write_particle                           |
   !+-------------------------------------------------------------------+
-
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is to write particles via HDF5.                   |
+  !+-------------------------------------------------------------------+
+  !| tecplot format for now                                            |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 27-09-2022  | Created by J. Fang                                  |
+  !+-------------------------------------------------------------------+
+  subroutine h5write_particle(itime)
+    !
+    use param, only : t
+    !
+    ! arguments
+    integer, intent(in) :: itime
+    !
+    ! local data
+    character(len=3) :: num
+    real(8),allocatable :: xpart(:),ypart(:),zpart(:)
+    integer :: psize,total_num_part,p,j
+    integer :: rank2coll
+    character(len=32) :: file2write
+    !
+    if(numparticle>0) then
+      !
+      allocate(xpart(numparticle),ypart(numparticle),zpart(numparticle))
+      !
+      psize=msize(particle)
+      j=0
+      do p=1,psize
+        !
+        if(particle(p)%new) cycle
+        !
+        j=j+1
+        xpart(j)=particle(p)%x(1)
+        ypart(j)=particle(p)%x(2)
+        zpart(j)=particle(p)%x(3)
+        !
+      enddo
+      !
+      rank2coll=nrank
+      !
+    else
+      rank2coll=-1
+    endif
+    !
+    total_num_part=psum(numparticle)
+    !
+    call subcomm_group(rank2coll,mpi_comm_particle,mpi_rank_part,mpi_size_part)
+    !
+    ! print*,' ** size of the particel comm:',mpi_size_part
+    !
+    if(rank2coll>=0) then
+      !
+      write(num,'(I3.3)') itime
+      !
+      file2write='./data/particle'//num//'.h5'
+      call h5io_init(filename=trim(file2write),mode='writ',comm=mpi_comm_particle)
+      !
+      call h5write(varname='time',var=t)
+      call h5write(varname='x',var=xpart,total_size=total_num_part,comm=mpi_comm_particle)
+      call h5write(varname='y',var=ypart,total_size=total_num_part,comm=mpi_comm_particle)
+      call h5write(varname='z',var=zpart,total_size=total_num_part,comm=mpi_comm_particle)
+      !
+      deallocate(xpart,ypart,zpart)
+      !
+      call h5io_end
+      !
+    endif
+    !
+    if(nrank==0) print*,' ** total number of particles is:',total_num_part
+    !
+  end subroutine h5write_particle
   !+-------------------------------------------------------------------+
   !| This subroutine is used to finalise mpi and stop the program.     |
   !+-------------------------------------------------------------------+
@@ -1121,20 +1278,28 @@ module partack
     !
   end function psum_mytype_ary
   !
-  function psum_integer(var) result(varsum)
+  function psum_integer(var,comm) result(varsum)
     !
     use mpi
     use decomp_2d, only : real_type
     !
     ! arguments
     integer,intent(in) :: var
+    integer,optional,intent(in) :: comm
     integer :: varsum
     !
     ! local data
-    integer :: ierr
+    integer :: ierr,comm_2_use
+    !
+    if(present(comm)) then
+        comm_2_use=comm
+    else
+        comm_2_use=mpi_comm_world
+    endif
+    !
     !
     call mpi_allreduce(var,varsum,1,mpi_integer,mpi_sum,           &
-                                                    mpi_comm_world,ierr)
+                                                    comm_2_use,ierr)
     !
     return
     !
@@ -1273,6 +1438,58 @@ module partack
     return
     !
   end function ptable_update_int_arr
+  !
+  function updatable_int(var,offset,debug,comm) result(table)
+    !
+    use mpi
+    !
+    ! arguments
+    integer :: table(0:mpi_size_part-1)
+    integer,intent(in) :: var
+    integer,optional,intent(out) :: offset
+    logical,intent(in),optional :: debug
+    integer,intent(in),optional :: comm
+    !
+    ! local data
+    integer :: comm_2_use
+    integer :: ierr,i
+    integer :: vta(0:mpi_size_part-1)
+    logical :: ldebug
+    !
+    if(present(debug)) then
+      ldebug=debug
+    else
+      ldebug=.false.
+    endif
+    !
+    if(present(comm)) then
+        comm_2_use=comm
+    else
+        comm_2_use=mpi_comm_world
+    endif
+    !
+    call mpi_allgather(var,1,mpi_integer,                              &
+                       vta,1,mpi_integer,comm_2_use,ierr)
+    !
+    table=vta
+    !
+    if(present(offset)) then
+      !
+      if(nrank==0) then
+        offset=0
+      else
+        !
+        offset=0
+        do i=0,nrank-1
+          offset=offset+vta(i)
+        enddo
+        !
+      endif
+      !
+    endif
+    !
+  end function updatable_int
+  !
   !+-------------------------------------------------------------------+
   !| The end of the subroutine ptable_update_int_arr.                  |
   !+-------------------------------------------------------------------+
@@ -1433,6 +1650,339 @@ module partack
   !+-------------------------------------------------------------------+
   !| The end of the function ptime.                                    |
   !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is used to open the h5file interface and assign   |
+  !| h5file_id. For write each new file, this will be called first, but|
+  !| once it is called, the file will be overwriten.                   |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 03-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
+  !+-------------------------------------------------------------------+
+  subroutine h5io_init(filename,mode,comm)
+    !
+    use mpi, only: mpi_comm_world,mpi_info_null
+    !
+    ! arguments
+    character(len=*),intent(in) :: filename
+    character(len=*),intent(in) :: mode
+    integer,intent(in),optional :: comm
+    ! h5file_id is returned
+    !
+    ! local data
+    integer :: h5error,comm_2_use
+    integer(hid_t) :: plist_id
+    !
+    if(present(comm)) then
+        comm_2_use=comm
+    else
+        comm_2_use=mpi_comm_world
+    endif
+    !
+    call h5open_f(h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_init call h5open_f'
+    !
+    ! create access property list and set mpi i/o
+    call h5pcreate_f(h5p_file_access_f,plist_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pcreate_f'
+    !
+    call h5pset_fapl_mpio_f(plist_id,comm_2_use,mpi_info_null,     &
+                                                                h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pset_fapl_mpio_f'
+    !
+    if(mode=='writ') then
+      call h5fcreate_f(filename,h5f_acc_trunc_f,h5file_id,             &
+                                            h5error,access_prp=plist_id)
+      if(h5error.ne.0)  stop ' !! error in h5io_init call h5fcreate_f'
+    elseif(mode=='read') then
+      call h5fopen_f(filename,h5f_acc_rdwr_f,h5file_id,                &
+                                            h5error,access_prp=plist_id)
+      if(h5error.ne.0)  stop ' !! error in h5io_init call h5fopen_f'
+    else
+        stop ' !! mode not defined @ h5io_init'
+    endif
+    !
+    call h5pclose_f(plist_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pclose_f'
+    !
+    if(nrank==0) print*,' ** open h5 file: ',filename
+    !
+  end subroutine h5io_init
+  !+-------------------------------------------------------------------+
+  !| This end of the subroutine h5io_init.                             |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is used to close hdf5 interface after finish      |
+  !| input/output a hdf5 file.                                         |
+  !| the only data needed is h5file_id                                 |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 03-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
+  !+-------------------------------------------------------------------+
+  subroutine h5io_end
+    !
+    ! local data
+    integer :: h5error
+    !
+    call h5fclose_f(h5file_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_end call h5fclose_f'
+    !
+    call h5close_f(h5error)
+    if(h5error.ne.0)  stop ' !! error in h5io_end call h5close_f'
+    !
+  end subroutine h5io_end
+  !+-------------------------------------------------------------------+
+  !| This end of the subroutine h5io_end.                              |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is used to write a 1D array with hdf5 interface.  |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 02-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
+  !+-------------------------------------------------------------------+
+  subroutine h5wa_r8(varname,var,total_size,comm)
+    !
+    use decomp_2d, only : mytype
+    use mpi, only: mpi_comm_world,mpi_info_null
+    ! use parallel,only: nrank,mpistop,psum,ptabupd,nrankmax
+    !
+    ! arguments
+    character(LEN=*),intent(in) :: varname
+    real(mytype),intent(in),allocatable :: var(:)
+    integer,intent(in) :: total_size
+    integer,intent(in),optional :: comm
+    !
+    ! local data
+    integer :: jrk,comm_2_use
+    integer :: dim,dima
+    integer :: dim_table(0:mpi_size_part-1)
+    integer(hsize_t), dimension(1) :: offset
+    integer :: h5error
+    !
+    integer(hid_t) :: dset_id,filespace,memspace,plist_id
+    integer(hsize_t) :: dimt(1),dimat(1)
+    !
+    if(allocated(var)) then
+      dim=size(var)
+    else
+      dim=0
+    endif
+    !
+    if(present(comm)) then
+        comm_2_use=comm
+    else
+        comm_2_use=mpi_comm_world
+    endif
+    !
+    ! dima=psum(dim,comm=comm_2_use)
+    !
+    dimt=(/dim/)
+    dimat=(/total_size/)
+    !
+    dim_table=ptabupd(dim,comm=mpi_comm_particle)
+    !
+    offset=0
+    do jrk=0,mpi_rank_part-1
+      offset=offset+dim_table(jrk)
+    enddo
+    !
+    ! print*,mpi_rank_part,nrank,'|',dim,offset
+    !
+    ! writing the data
+    !
+    call h5screate_simple_f(1,dimat,filespace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5screate_simple_f'
+    call h5dcreate_f(h5file_id,varname,h5t_native_double,filespace,    &
+                                                       dset_id,h5error)
+
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dcreate_f'
+    call h5screate_simple_f(1,dimt,memspace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5screate_simple_f'
+    call h5sclose_f(filespace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
+    call h5dget_space_f(dset_id,filespace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dget_space_f'
+    call h5sselect_hyperslab_f(filespace,h5s_select_set_f,offset,      &
+                                                          dimt,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sselect_hyperslab_f'
+    call h5pcreate_f(h5p_dataset_xfer_f,plist_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pcreate_f'
+    call h5pset_dxpl_mpio_f(plist_id,h5fd_mpio_collective_f,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pset_dxpl_mpio_f'
+    call h5dwrite_f(dset_id,h5t_native_double,var,dimt,h5error,        &
+                    file_space_id=filespace,mem_space_id=memspace,     &
+                                                     xfer_prp=plist_id)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dwrite_f'
+    call h5sclose_f(filespace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
+    call h5sclose_f(memspace,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
+    call h5dclose_f(dset_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dclose_f'
+    call h5pclose_f(plist_id,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pclose_f'
+    !
+    if(mpi_rank_part==0) print*,' << ',varname
+    !
+  end subroutine h5wa_r8
+  !
+  subroutine h5w_int4(varname,var)
+    !
+    use mpi, only: mpi_info_null
+    !
+    ! arguments
+    character(LEN=*),intent(in) :: varname
+    integer,intent(in) :: var
+    !
+    ! local data
+    integer :: nvar(1)
+    integer :: h5error
+    integer(hsize_t) :: dimt(1)=(/1/)
+    !
+    ! writing the data
+    !
+    nvar=var
+    call h5ltmake_dataset_f(h5file_id,varname,1,dimt,                  &
+                                        h5t_native_integer,nvar,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5w_int4 call h5ltmake_dataset_f'
+    !
+    if(nrank==0) print*,' << ',varname
+    !
+  end subroutine h5w_int4
+  !
+  subroutine h5w_real8(varname,var)
+    !
+    use mpi, only: mpi_info_null
+    !
+    ! arguments
+    character(LEN=*),intent(in) :: varname
+    real(8),intent(in) :: var
+    !
+    ! local data
+    real(8) :: rvar(1)
+    integer :: h5error
+    integer(hsize_t) :: dimt(1)=(/1/)
+    !
+    rvar=var
+    call h5ltmake_dataset_f(h5file_id,varname,1,dimt,                  &
+                                        h5t_native_double,rvar,h5error)
+    if(h5error.ne.0)  stop ' !! error in h5w_real8 call h5ltmake_dataset_f'
+    !
+    if(nrank==0) print*,' << ',varname
+    !
+  end subroutine h5w_real8
+  !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is to create a sub-communicator from nranks.    |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 12-08-2022: Created by J. Fang @ STFC Daresbury Laboratory        |
+  !+-------------------------------------------------------------------+
+  subroutine subcomm_group(rank,communicator,newrank,newsize)
+    !
+    use mpi
+    ! arguments
+    integer,intent(in) :: rank
+    integer,intent(out) :: communicator,newrank,newsize
+    !
+    ! local data
+    integer :: group_mpi,mpi_group_world
+    integer :: ierr,ncout,jrank
+    integer,allocatable :: rank_use(:),ranktemp(:)
+    !
+    allocate(ranktemp(0:nproc-1))
+    !
+    call pgather(rank,ranktemp)
+    !
+    ncout=0
+    do jrank=0,nproc-1
+      !
+      if(ranktemp(jrank)>=0) then
+        ncout=ncout+1
+      endif
+      !
+    enddo
+    !
+    allocate(rank_use(1:ncout))
+    !
+    ncout=0
+    do jrank=0,nproc-1
+      !
+      if(ranktemp(jrank)>=0) then
+        ncout=ncout+1
+        !
+        rank_use(ncout)=ranktemp(jrank)
+        !
+      endif
+      !
+    enddo
+    !
+    call mpi_comm_group(mpi_comm_world,mpi_group_world,ierr)
+    call mpi_group_incl(mpi_group_world,size(rank_use),rank_use,group_mpi,ierr)
+    call mpi_comm_create(mpi_comm_world,group_mpi,communicator,ierr)
+    !
+    if(any(rank_use==nrank)) then
+      call mpi_comm_size(communicator,newsize,ierr)
+      call mpi_comm_rank(communicator,newrank,ierr)
+      if(newrank==0) print*,' ** new subcomm created, size: ',newsize
+      ! print*,' ** local rank:',newrank,', gloable rank:',nrank
+    else
+      newrank=-1
+      newsize=0
+    endif
+    !
+  end subroutine subcomm_group
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine subcomm_group.                          |
+  !+-------------------------------------------------------------------+
+  !
+  subroutine pgather_int(var,data,mode)
+    !
+    use mpi
+    !
+    ! arguments
+    integer,intent(in) :: var
+    integer,intent(out),allocatable :: data(:)
+    character(len=*),intent(in),optional :: mode
+    !
+    !
+    ! local data
+    integer :: counts(0:nproc-1)
+    integer :: ierr,jrank,ncou
+    !
+    call mpi_allgather(var, 1, mpi_integer, counts, 1, mpi_integer,  &
+                       mpi_comm_world, ierr)
+    !
+    if(present(mode) .and. mode=='noneg') then
+      ! only pick >=0 values
+      ncou=0
+      do jrank=0,nproc-1
+        if(counts(jrank)>=0) then
+          ncou=ncou+1
+        endif
+      enddo
+      !
+      allocate(data(ncou))
+      ncou=0
+      do jrank=0,nproc-1
+        if(counts(jrank)>=0) then
+          ncou=ncou+1
+          data(ncou)=counts(jrank)
+        endif
+      enddo
+      !
+    else
+      allocate(data(0:nproc-1))
+      data=counts
+    endif
+    !
+  end subroutine pgather_int
   !
 end module partack
 !+---------------------------------------------------------------------+

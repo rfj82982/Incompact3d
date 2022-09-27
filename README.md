@@ -1,3 +1,6 @@
+
+[![DOI](https://zenodo.org/badge/127266756.svg)](https://zenodo.org/badge/latestdoi/127266756)
+
 ## The Xcompact3d code
 
 Xcompact3d is a Fortran-based framework of high-order finite-difference flow solvers dedicated to the study of turbulent flows. Dedicated to Direct and Large Eddy Simulations (DNS/LES) for which the largest turbulent scales are simulated, it can combine the versatility of industrial codes with the accuracy of spectral codes. Its user-friendliness, simplicity, versatility, accuracy, scalability, portability and efficiency makes it an attractive tool for the Computational Fluid Dynamics community.
@@ -49,3 +52,17 @@ or
 
     nohup mpirun -np 16 ../../xcompact3d > output.out &
 
+### Releases
+
+Releases are available via git tags, also on the main Github, or via the [Zenodo DOI](https://zenodo.org/badge/latestdoi/127266756) (see top of README page on Github).
+
+### Optional ADIOS2 I/O backend
+
+As part of the ARCHER2 eCSE0302 project, an optional I/O backend using ADIOS2 has been added to the 2DECOMP&FFT library distributed with Xcompact3d.
+This is enabled at compile time, by default the original MPIIO backend will be used, to enable the ADIOS2 backend build as
+
+    make clean
+    make IO=adios2 ADIOS2DIR=${ADIOS2_DIR}
+    
+where `${ADIOS2_DIR}` points to the install location of ADIOS2.
+ADIOS2 enables configuring the I/O behaviour at runtime using an `xml` configuration file - see the example at `examples/Taylor-Green-Vortex/adios2_config.xml`.

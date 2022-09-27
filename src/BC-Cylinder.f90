@@ -1,34 +1,6 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 module cyl
 
@@ -44,7 +16,7 @@ module cyl
 
   PRIVATE ! All functions/subroutines private by default
   PUBLIC :: init_cyl, boundary_conditions_cyl, postprocess_cyl, &
-            geomcomplex_cyl, visu_cyl
+            geomcomplex_cyl, visu_cyl, visu_cyl_init
 
 contains
 
@@ -328,6 +300,22 @@ contains
 
   end subroutine postprocess_cyl
 
+  subroutine visu_cyl_init (visu_initialised)
+
+    use decomp_2d, only : mytype
+    use decomp_2d_io, only : decomp_2d_register_variable
+    use visu, only : io_name, output2D
+    
+    implicit none
+
+    logical, intent(out) :: visu_initialised
+
+    call decomp_2d_register_variable(io_name, "vort", 1, 0, output2D, mytype)
+    call decomp_2d_register_variable(io_name, "critq", 1, 0, output2D, mytype)
+
+    visu_initialised = .true.
+    
+  end subroutine visu_cyl_init
   !############################################################################
   !!
   !!  SUBROUTINE: visu_cyl
@@ -395,7 +383,7 @@ contains
     di1(:,:,:)=sqrt(  (tf1(:,:,:)-th1(:,:,:))**2 &
                     + (tg1(:,:,:)-tc1(:,:,:))**2 &
                     + (tb1(:,:,:)-td1(:,:,:))**2)
-    call write_field(di1, ".", "vort", trim(num))
+    call write_field(di1, ".", "vort", trim(num), flush = .true.) ! Reusing temporary array, force flush
 
     !Q=-0.5*(ta1**2+te1**2+ti1**2)-td1*tb1-tg1*tc1-th1*tf1
     di1 = zero
@@ -403,7 +391,7 @@ contains
                   - td1(:,:,:)*tb1(:,:,:) &
                   - tg1(:,:,:)*tc1(:,:,:) &
                   - th1(:,:,:)*tf1(:,:,:)
-    call write_field(di1, ".", "critq", trim(num))
+    call write_field(di1, ".", "critq", trim(num), flush = .true.) ! Reusing temporary array, force flush
 
   end subroutine visu_cyl
 

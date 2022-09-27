@@ -1,34 +1,7 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
+
 !###########################################################################
 !
 !  SUBROUTINE: parameter
@@ -100,7 +73,7 @@ subroutine parameter(input_i3d)
        imassconserve, ibuoyancy, iPressureGradient, iCoriolis, CoriolisFreq, &
        istrat, idamping, iheight, TempRate, TempFlux, itherm, gravv, UG, T_wall, T_top, ishiftedper, iconcprec, pdl 
   NAMELIST /CASE/ tgv_twod, pfront
-  NAMELIST/ALMParam/ialmrestart,filealmrestart,iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
+  NAMELIST/ALMParam/iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange
 
@@ -715,38 +688,6 @@ subroutine parameter_defaults()
   flag_all_digits = .false.
   flag_extra_probes = .false.
 
-  save_ux = 0
-  save_uy = 0
-  save_uz = 0
-  save_phi = 0
-  save_uxm = 0
-  save_uym = 0
-  save_uzm = 0
-  save_phim = 0
-  save_w = 0
-  save_w1 = 0
-  save_w2 = 0
-  save_w3 = 0
-  save_qc = 0
-  save_pc = 0
-  save_V = 0
-  save_dudx = 0
-  save_dudy = 0
-  save_dudz = 0
-  save_dvdx = 0
-  save_dvdy = 0
-  save_dvdz = 0
-  save_dwdx = 0
-  save_dwdy = 0
-  save_dwdz = 0
-  save_dphidx = 0
-  save_dphidy = 0
-  save_dphidz = 0
-  save_pre = 0
-  save_prem = 0
-  save_dmap = 0
-  save_utmap = 0
-  save_ibm = 0
 
   ipost = 0
   iibm=0

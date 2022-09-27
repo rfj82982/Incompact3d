@@ -1,34 +1,6 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
 
 !********************************************************************
 !
@@ -475,9 +447,9 @@ subroutine second_derivative(alsa1,as1,bs1,&
      if (nrank==0) write(*,*)'Set of coefficients not ready yet'
      call MPI_ABORT(MPI_COMM_WORLD,code,ierror); stop
   elseif(isecondder==4) then ! Sixth-order compact Lele style (no extra dissipation)
-     alsai= 2./11.
-     asi  = (12./11.)/d2
-     bsi  = (3./44. )/d2
+     alsai= two / eleven
+     asi  = (twelve / eleven)/d2
+     bsi  = (three / 44.0_mytype )/d2
      csi  = zero
      dsi = zero
 
@@ -733,7 +705,7 @@ subroutine interpolation(dx,nxm,nx,nclx1,nclxn,&
   cbx6(2)=alcaix6
   cbx6(nxm-2)=alcaix6
   cbx6(nxm-1)=alcaix6
-  cbx6(nxm)=0.
+  cbx6(nxm)=zero
   do i=3,nxm-3
      cfx6(i)=alcaix6
      ccx6(i)=one
@@ -858,9 +830,9 @@ subroutine interpolation(dx,nxm,nx,nclx1,nclxn,&
   call prepare (cibi6,cici6,cifip6,cisip6,ciwip6,nx)
   if (nclxn.eq.1) then
      cbx6(nxm-1)=zero
-     cibx6(nxm)=0
+     cibx6(nxm)=zero
      cbi6(nx-1)=zero
-     cibi6(nx)=0
+     cibi6(nx)=zero
      call prepare (cbx6,ccx6,cfxp6,csxp6,cwxp6,nxm)
      call prepare (cibx6,cicx6,cifxp6,cisxp6,ciwxp6,nxm)
      call prepare (cbi6,cci6,cfip6,csip6,cwip6,nx)

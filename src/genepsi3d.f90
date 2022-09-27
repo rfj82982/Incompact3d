@@ -1,34 +1,7 @@
-!################################################################################
-!This file is part of Xcompact3d.
-!
-!Xcompact3d
-!Copyright (c) 2012 Eric Lamballais and Sylvain Laizet
-!eric.lamballais@univ-poitiers.fr / sylvain.laizet@gmail.com
-!
-!    Xcompact3d is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation.
-!
-!    Xcompact3d is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with the code.  If not, see <http://www.gnu.org/licenses/>.
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-!    We kindly request that you cite Xcompact3d/Incompact3d in your
-!    publications and presentations. The following citations are suggested:
-!
-!    1-Laizet S. & Lamballais E., 2009, High-order compact schemes for
-!    incompressible flows: a simple and efficient method with the quasi-spectral
-!    accuracy, J. Comp. Phys.,  vol 228 (15), pp 5989-6015
-!
-!    2-Laizet S. & Li N., 2011, Incompact3d: a powerful tool to tackle turbulence
-!    problems with up to 0(10^5) computational cores, Int. J. of Numerical
-!    Methods in Fluids, vol 67 (11), pp 1735-1757
-!################################################################################
+!Copyright (c) 2012-2022, Xcompact3d
+!This file is part of Xcompact3d (xcompact3d.com)
+!SPDX-License-Identifier: BSD 3-Clause
+
 module genepsi
 
   public
@@ -110,8 +83,9 @@ contains
 !############################################################################
   subroutine genepsi3d(ep1)
 
-    USE variables, only : nx,ny,nz,nxm,nym,nzm,yp
+    USE variables, only : nx,ny,nz,nxm,nym,nzm,yp, ilist
     USE param, only : xlx,yly,zlz,dx,dy,dz,izap,npif,nclx,ncly,nclz,istret,itype,itype_sandbox
+    use param, only : itime
     USE complex_geometry
     use decomp_2d
 
@@ -131,7 +105,7 @@ contains
     logical :: dir_exists
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ep1
     !
-    if (nrank==0) then
+    if (nrank==0.and.mod(itime,ilist)==0) then
       write(*,*)'==========================================================='
       write(*,*)'Generating the geometry!'
     end if
@@ -805,13 +779,14 @@ contains
     integer                            :: npif
     integer                            :: i,j,k,count
     character :: tmp_char
+    character(len=*), parameter :: io_geom = "io-geom"
     !###################################################################
     if (read_flag) then
       if (nrank==0) print *,'Reading geometry'
-      call decomp_2d_read_one(1,ep1,'data/geometry/epsilon.bin')   
+      call decomp_2d_read_one(1,ep1,'data/geometry','epsilon.bin',io_geom)   
     else
       if (nrank==0) print *,'Writing geometry'
-      call decomp_2d_write_one(1,ep1,'data/geometry/epsilon.bin')
+      call decomp_2d_write_one(1,ep1,'data/geometry','epsilon.bin',0,io_geom)
     endif
     !###################################################################
     !x-pencil

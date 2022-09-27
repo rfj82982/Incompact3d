@@ -15,6 +15,8 @@ IVER = 17# 15,16,17,18
 CMP = gcc# intel,gcc
 FFT = generic# generic,fftw3,mkl
 
+BUILD ?=
+
 #######CMP settings###########
 ifeq ($(CMP),intel)
 FC = mpiifort
@@ -24,8 +26,13 @@ FFLAGS = -fpp -O3 -xSSE4.2 -axAVX,CORE-AVX-I,CORE-AVX2 -ipo -fp-model fast=2 -mc
 else ifeq ($(CMP),gcc)
 FC = mpif90
 #FFLAGS = -O3 -funroll-loops -floop-optimize -g -Warray-bounds -fcray-pointer -x f95-cpp-input
-FFLAGS = -cpp -O3 -funroll-loops -floop-optimize -g -Warray-bounds -fcray-pointer -fbacktrace -ffree-line-length-none
-#-ffpe-trap=invalid,zero
+ifeq ($(BUILD),debug)
+FFLAGS = -cpp -g3 -Og
+FFLAGS += -ffpe-trap=invalid,zero -fcheck=bounds
+else
+FFLAGS = -cpp -O3 -funroll-loops -floop-optimize -g
+endif
+FFLAGS += -Warray-bounds -fcray-pointer -fbacktrace -ffree-line-length-none
 ifeq "$(shell expr `gfortran -dumpversion | cut -f1 -d.` \>= 10)" "1"
 FFLAGS += -fallow-argument-mismatch
 endif
@@ -71,6 +78,9 @@ else ifeq ($(FFT),mkl)
   SRCDECOMP := $(DECOMPDIR)/mkl_dfti.f90 $(SRCDECOMP)
   LIBFFT=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread
 	INC=-I$(MKLROOT)/include
+else ifeq ($(FFT),ffte)
+  INC:=
+  LIBFFT:=-L$(FFTE_DIR)/lib -lffte
 endif
 
 #######OPTIONS settings###########
@@ -84,7 +94,7 @@ ifeq ($(IO),adios2)
     $(error Set ADIOS2DIR=/path/to/adios2/install/)
   endif
   OPT := -DADIOS2 $(OPT)
-  INC := $(INC) $(patsubst $(shell $(ADIOS2DIR)/bin/adios2-config --fortran-libs),,$(shell $(ADIOS2DIR)/bin/adios2-config -f))
+  INC := $(INC) $(shell $(ADIOS2DIR)/bin/adios2-config --fortran-flags) #$(patsubst $(shell $(ADIOS2DIR)/bin/adios2-config --fortran-libs),,$(shell $(ADIOS2DIR)/bin/adios2-config -f))
   LIBIO := $(shell $(ADIOS2DIR)/bin/adios2-config --fortran-libs)
 endif
 
@@ -120,9 +130,9 @@ post:
 
 
 clean:
-	rm -f $(DECOMPDIR)/*.o $(DECOMPDIR)/*.mod
-	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod
-	rm -f *.o *.mod xcompact3d
+	rm -f $(DECOMPDIR)/*.o $(DECOMPDIR)/*.mod $(DECOMPDIR)/*.smod
+	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod $(SRCDIR)/*.smod
+	rm -f *.o *.mod *.smod xcompact3d
 
 .PHONY: cleanall
 cleanall: clean
