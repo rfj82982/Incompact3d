@@ -19,6 +19,10 @@ module partack
     module procedure psum_integer
   end interface
   !
+  interface pmax
+    module procedure pmax_int
+  end interface
+  !
   interface mclean
     module procedure mclean_mytype
     module procedure mclean_particle
@@ -91,7 +95,7 @@ module partack
   character(len=4) :: rankname
   real(8) :: part_time,part_comm_time,part_vel_time,part_dmck_time,a2a_time, &
              count_time,data_pack_time,data_unpack_time,mpi_comm_time,       &
-             table_share_time
+             table_share_time,h5io_time
   !+------------------+--------------------------------------------+
   !|         lpartack | switch of particel tracking                |
   !|      numparticle | number of particles in the domain          |
@@ -194,6 +198,7 @@ module partack
       write(*,*) '           data packing  :',real(data_pack_time,4)
       write(*,*) '           MPI Alltoall  :',real(mpi_comm_time,4)
       write(*,*) '           data unpacking:',real(data_unpack_time,4)
+      write(*,*) '                  hdf5 io:',real(h5io_time,4)
     endif
     !
   end subroutine partcle_report
@@ -287,7 +292,7 @@ module partack
     ! call partical_swap
     !
     ! call write_particle()
-    call h5write_particle(0)
+    call h5write_particle()
     !
     part_time=0.d0
     part_comm_time=0.d0
@@ -299,6 +304,7 @@ module partack
     data_pack_time=0.d0
     data_unpack_time=0.d0
     mpi_comm_time=0.d0
+    h5io_time=0.d0
     !
   end subroutine init_particle
   !+-------------------------------------------------------------------+
@@ -1165,12 +1171,9 @@ module partack
   !| -------------                                                     |
   !| 27-09-2022  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine h5write_particle(itime)
+  subroutine h5write_particle()
     !
     use param, only : t
-    !
-    ! arguments
-    integer, intent(in) :: itime
     !
     ! local data
     character(len=3) :: num
@@ -1178,6 +1181,31 @@ module partack
     integer :: psize,total_num_part,p,j
     integer :: rank2coll
     character(len=32) :: file2write
+    real(8) :: timebeg
+    integer,save :: itime=0
+    logical,save :: init=.true.
+    !
+    timebeg=ptime()
+    !
+    if(init) then
+      !
+      ! write head of the xdmf file
+      if(nrank==0) then
+        open(22,file='./visu_particle.xdmf',form='formatted')
+        write(22,'(A)')'<?xml version="1.0" encoding="UTF-8" ?>'
+        write(22,'(A)')'<Xdmf Version="3.0" xmlns:xi="http://www.w3.org/2001/XInclude">'
+        write(22,'(A)')'<Domain>'
+        write(22,'(A)')'  <Grid Name="Particle" GridType="Collection" CollectionType="Temporal">'
+        write(22,'(A)')'  </Grid>'
+        write(22,'(A)')'</Domain>'
+        write(22,'(A)')'</Xdmf>'
+        close(22)
+        print*,' << visu_particle.xdmf'
+      endif
+      !
+      init=.false.
+      !
+    endif
     !
     if(numparticle>0) then
       !
@@ -1208,23 +1236,66 @@ module partack
     !
     ! print*,' ** size of the particel comm:',mpi_size_part
     !
+    itime=pmax(itime)
+    !
     if(rank2coll>=0) then
       !
       write(num,'(I3.3)') itime
       !
       file2write='./data/particle'//num//'.h5'
-      call h5io_init(filename=trim(file2write),mode='writ',comm=mpi_comm_particle)
+      call h5io_init(filename=trim(file2write),mode='writ',            &
+                                                 comm=mpi_comm_particle)
       !
       call h5write(varname='time',var=t)
-      call h5write(varname='x',var=xpart,total_size=total_num_part,comm=mpi_comm_particle)
-      call h5write(varname='y',var=ypart,total_size=total_num_part,comm=mpi_comm_particle)
-      call h5write(varname='z',var=zpart,total_size=total_num_part,comm=mpi_comm_particle)
-      !
+      call h5write(varname='x',var=xpart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
+      call h5write(varname='y',var=ypart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
+      call h5write(varname='z',var=zpart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
       deallocate(xpart,ypart,zpart)
       !
       call h5io_end
       !
+      if(mpi_rank_part==0) then
+        open(22,file='./visu_particle.xdmf',form='formatted',position="append")
+        backspace(22)
+        backspace(22)
+        backspace(22)
+        write(22,'(A,A,A)')    '    <Grid Name=" particle',num,'" GridType="Uniform">'
+        write(22,'(A,F12.6,A)')'    <Time Value="',t,'" />'
+        write(22,'(A,I0,A)')   '    <Topology Name="ParticleTopo" TopologyType="PolyVertex" NumberOfElements="',total_num_part,'"/>'
+        write(22,'(A)')        '    <Geometry GeometryType="X_Y_Z">'
+        write(22,'(A,I0,A)')   '    <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="',total_num_part,'">'
+        write(22,'(A,A,A)')    '       ',trim(file2write),':x'
+        write(22,'(A)')        '    </DataItem>'
+        write(22,'(A,I0,A)')   '    <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="',total_num_part,'">'
+        write(22,'(A,A,A)')    '       ',trim(file2write),':y'
+        write(22,'(A)')        '    </DataItem>'
+        write(22,'(A,I0,A)')   '    <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="',total_num_part,'">'
+        write(22,'(A,A,A)')    '       ',trim(file2write),':z'
+        write(22,'(A)')        '    </DataItem>'
+        write(22,'(A)')        '    </Geometry>'
+        write(22,'(A)')        '    </Grid>' 
+        write(22,'(A)')        '  </Grid>'
+        write(22,'(A)')        '</Domain>'
+        write(22,'(A)')        '</Xdmf>'
+        !
+        close(22)
+        print*,' << visu_particle.xdmf'
+      endif
+      !
+      itime=itime+1
+      !
     endif
+    !
+    h5io_time=h5io_time+ptime()-timebeg
     !
     if(nrank==0) print*,' ** total number of particles is:',total_num_part
     !
@@ -1289,17 +1360,17 @@ module partack
     integer :: varsum
     !
     ! local data
-    integer :: ierr,comm_2_use
+    integer :: ierr,comm2use
     !
     if(present(comm)) then
-        comm_2_use=comm
+        comm2use=comm
     else
-        comm_2_use=mpi_comm_world
+        comm2use=mpi_comm_world
     endif
     !
     !
     call mpi_allreduce(var,varsum,1,mpi_integer,mpi_sum,           &
-                                                    comm_2_use,ierr)
+                                                    comm2use,ierr)
     !
     return
     !
@@ -1439,21 +1510,21 @@ module partack
     !
   end function ptable_update_int_arr
   !
-  function updatable_int(var,offset,debug,comm) result(table)
+  function updatable_int(var,offset,debug,comm,comm_size) result(table)
     !
     use mpi
     !
     ! arguments
-    integer :: table(0:mpi_size_part-1)
+    integer,allocatable :: table(:)
     integer,intent(in) :: var
     integer,optional,intent(out) :: offset
     logical,intent(in),optional :: debug
-    integer,intent(in),optional :: comm
+    integer,intent(in),optional :: comm,comm_size
     !
     ! local data
-    integer :: comm_2_use
+    integer :: comm2use,comm2size
     integer :: ierr,i
-    integer :: vta(0:mpi_size_part-1)
+    integer,allocatable :: vta(:)
     logical :: ldebug
     !
     if(present(debug)) then
@@ -1463,13 +1534,21 @@ module partack
     endif
     !
     if(present(comm)) then
-        comm_2_use=comm
+        comm2use=comm
     else
-        comm_2_use=mpi_comm_world
+        comm2use=mpi_comm_world
     endif
     !
+    if(present(comm_size)) then
+        comm2size=comm_size
+    else
+        comm2size=nproc
+    endif
+    !
+    allocate(table(0:comm2size-1),vta(0:comm2size-1))
+    !
     call mpi_allgather(var,1,mpi_integer,                              &
-                       vta,1,mpi_integer,comm_2_use,ierr)
+                       vta,1,mpi_integer,comm2use,ierr)
     !
     table=vta
     !
@@ -1671,13 +1750,13 @@ module partack
     ! h5file_id is returned
     !
     ! local data
-    integer :: h5error,comm_2_use
+    integer :: h5error,comm2use
     integer(hid_t) :: plist_id
     !
     if(present(comm)) then
-        comm_2_use=comm
+        comm2use=comm
     else
-        comm_2_use=mpi_comm_world
+        comm2use=mpi_comm_world
     endif
     !
     call h5open_f(h5error)
@@ -1687,7 +1766,7 @@ module partack
     call h5pcreate_f(h5p_file_access_f,plist_id,h5error)
     if(h5error.ne.0)  stop ' !! error in h5io_init call h5pcreate_f'
     !
-    call h5pset_fapl_mpio_f(plist_id,comm_2_use,mpi_info_null,     &
+    call h5pset_fapl_mpio_f(plist_id,comm2use,mpi_info_null,     &
                                                                 h5error)
     if(h5error.ne.0)  stop ' !! error in h5io_init call h5pset_fapl_mpio_f'
     !
@@ -1745,7 +1824,7 @@ module partack
   !| -------------                                                     |
   !| 02-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
   !+-------------------------------------------------------------------+
-  subroutine h5wa_r8(varname,var,total_size,comm)
+  subroutine h5wa_r8(varname,var,total_size,comm,comm_size,comm_rank)
     !
     use decomp_2d, only : mytype
     use mpi, only: mpi_comm_world,mpi_info_null
@@ -1755,12 +1834,12 @@ module partack
     character(LEN=*),intent(in) :: varname
     real(mytype),intent(in),allocatable :: var(:)
     integer,intent(in) :: total_size
-    integer,intent(in),optional :: comm
+    integer,intent(in),optional :: comm,comm_size,comm_rank
     !
     ! local data
-    integer :: jrk,comm_2_use
-    integer :: dim,dima
-    integer :: dim_table(0:mpi_size_part-1)
+    integer :: jrk
+    integer :: dim,dima,rank2use,comm2use,comm2size
+    integer,allocatable :: dim_table(:)
     integer(hsize_t), dimension(1) :: offset
     integer :: h5error
     !
@@ -1774,20 +1853,33 @@ module partack
     endif
     !
     if(present(comm)) then
-        comm_2_use=comm
+        comm2use=comm
     else
-        comm_2_use=mpi_comm_world
+        comm2use=mpi_comm_world
     endif
     !
-    ! dima=psum(dim,comm=comm_2_use)
+    if(present(comm_size)) then
+        comm2size=comm_size
+    else
+        comm2size=nproc
+    endif
+    !
+    if(present(comm_rank)) then
+        rank2use=comm_rank
+    else
+        rank2use=nrank
+    endif
+    !
+    allocate(dim_table(0:comm2size-1))
+    ! dima=psum(dim,comm=comm2use)
     !
     dimt=(/dim/)
     dimat=(/total_size/)
     !
-    dim_table=ptabupd(dim,comm=mpi_comm_particle)
+    dim_table=ptabupd(dim,comm=comm2use,comm_size=comm2size)
     !
     offset=0
-    do jrk=0,mpi_rank_part-1
+    do jrk=0,rank2use-1
       offset=offset+dim_table(jrk)
     enddo
     !
@@ -1983,6 +2075,21 @@ module partack
     endif
     !
   end subroutine pgather_int
+  !
+  integer function  pmax_int(var)
+    !
+    use mpi
+    !
+    ! arguments
+    integer,intent(in) :: var
+    !
+    ! local data
+    integer :: ierr
+    !
+    call mpi_allreduce(var,pmax_int,1,mpi_integer,mpi_max,             &
+                                                    mpi_comm_world,ierr)
+    !
+  end function pmax_int
   !
 end module partack
 !+---------------------------------------------------------------------+

@@ -280,7 +280,7 @@ contains
 
     if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
       !
-      call h5write_particle(itime)
+      call h5write_particle()
       !
       call partile_inject()
       !
