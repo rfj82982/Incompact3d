@@ -282,7 +282,7 @@ contains
       !
       call h5write_particle()
       !
-      call partile_inject()
+      ! call partile_inject()
       !
     endif
 

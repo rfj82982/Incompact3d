@@ -333,7 +333,7 @@ module partack
     !
     numparticle=numparticle+n
     !
-    call partical_domain_check
+    call partical_domain_check('out_disappear')
     !
     call partical_swap
     !
@@ -421,6 +421,7 @@ module partack
     integer :: jpart,npart,i,j,k,psize
     type(partype),pointer :: pa
     real(mytype) :: x1,y1,z1,x2,y2,z2
+    real(mytype) :: test(xsize(1),xsize(2),xsize(3))
     real(mytype),allocatable,dimension(:,:,:) :: ux1_halo,uy1_halo,    &
                                                  uz1_halo,ux1_hal2,    &
                                                  uy1_hal2,uz1_hal2
@@ -488,17 +489,78 @@ module partack
     !   if(nclz .and. zpa(p)>=zlz) zpa(p)=zpa(p)-zlz
     ! enddo
     !
-    call update_halo(ux1,ux1_halo,1,opt_global=.true.)
-    call update_halo(uy1,uy1_halo,1,opt_global=.true.)
-    call update_halo(uz1,uz1_halo,1,opt_global=.true.)
+    allocate( ux1_halo(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1),        &
+              uy1_halo(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1),        &
+              uz1_halo(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1) )
+    ! !
+    ! do k=1,xsize(3)
+    ! do j=1,xsize(2)
+    ! do i=1,xsize(1)
+    !   test(i,j,k)=nrank*10000+j
+    ! enddo
+    ! enddo
+    ! enddo
     !
-    allocate(ux1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
-    allocate(uy1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
-    allocate(uz1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
+    call pswap_yz(ux1,ux1_halo)
+    call pswap_yz(uy1,uy1_halo)
+    call pswap_yz(uz1,uz1_halo)
     !
-    ux1_hal2=ux1_halo
-    uy1_hal2=uy1_halo
-    uz1_hal2=uz1_halo
+    ! call update_halo(test,ux1_halo,1,opt_global=.true.)
+    !
+    ! call update_halo(ux1,ux1_halo,1,opt_global=.true.)
+    ! call update_halo(uy1,uy1_halo,1,opt_global=.true.)
+    ! call update_halo(uz1,uz1_halo,1,opt_global=.true.)
+    ! !
+    ! allocate(ux1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
+    ! allocate(uy1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
+    ! allocate(uz1_hal2(1:xsize(1),0:xsize(2)+1,0:xsize(3)+1))
+    !
+    ! do k=0,xsize(3)+1
+    ! do j=0,xsize(2)+1
+    ! do i=1,xsize(1)
+    !   ux1_hal2(i,j,k)=ux1_halo(i,j+1,k+1)
+    !   uy1_hal2(i,j,k)=uy1_halo(i,j+1,k+1)
+    !   uz1_hal2(i,j,k)=uz1_halo(i,j+1,k+1)
+    ! enddo
+    ! enddo
+    ! enddo
+      
+    !
+    ! i=10
+    ! j=10
+    ! k=10
+    ! ! do j=0,xsize(2)+1
+    ! do k=1,xsize(3)
+    !   if(nrank==3 .or. nrank==2) then
+    !     print*,nrank,'~',i,j,k,ux1_halo(i,j,k),ux1(i,j,k)
+    !   endif
+    !   !
+    ! enddo
+    ! if(nrank==1)  print*,nrank,'~',j,ux1_halo(10,:,10)
+    !
+    ! print*,size(ux1_halo,1),size(ux1_halo,2),size(ux1_halo,3),xsize(1),xsize(2),xsize(3)
+    ! print*,nrank,'|',yy(1),'-',yy(xsize(2)),':',zz(1),'-',zz(xsize(3))
+    ! call mpistop
+    !
+    ! ux1_hal2(1:xsize(1),:,:)=ux1_halo(1:xsize(1),:,:)
+    ! uy1_hal2(1:xsize(1),:,:)=uy1_halo(1:xsize(1),:,:)
+    ! uz1_hal2(1:xsize(1),:,:)=uz1_halo(1:xsize(1),:,:)
+    ! !
+    ! ux1_hal2(xsize(1)+1,:,:)=ux1_halo(1,:,:)
+    ! uy1_hal2(xsize(1)+1,:,:)=uy1_halo(1,:,:)
+    ! uz1_hal2(xsize(1)+1,:,:)=uz1_halo(1,:,:)
+    !
+    ! if(nrank==0) then
+    !   print*,nrank,'-',ux1_halo(1,10,1:3)
+    ! endif
+    ! if(nrank==1) then
+    !   print*,nrank,'-',ux1_halo(1,10,32:34)
+    ! endif
+    ! print*,nrank,'-',xsize
+    ! print*,nrank,size(uz1_hal2,1),size(uz1_hal2,2),size(uz1_hal2,3)
+    ! print*,nrank,size(ux1_halo,1),size(ux1_halo,2),size(ux1_halo,3)
+    ! call mpistop
+    !
     !
     ! allocate(ux1_halo2(1:size(ux1_halo,1),1:size(ux1_halo,2),1:size(ux1_halo,3)))
     ! ux1_halo2=ux1_halo
@@ -569,37 +631,42 @@ module partack
               pa%v(1)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
                                             pa%x(1),pa%x(2),pa%x(3),      &
-                                            ux1_hal2(i,j,k),     &
-                                            ux1_hal2(i+1,j,k),   &
-                                            ux1_hal2(i,j,k+1),   &
-                                            ux1_hal2(i+1,j,k+1), &
-                                            ux1_hal2(i,j+1,k),   &
-                                            ux1_hal2(i+1,j+1,k), &
-                                            ux1_hal2(i,j+1,k+1), &
-                                            ux1_hal2(i+1,j+1,k+1))
+                                            ux1_halo(i,j,k),     &
+                                            ux1_halo(i+1,j,k),   &
+                                            ux1_halo(i,j,k+1),   &
+                                            ux1_halo(i+1,j,k+1), &
+                                            ux1_halo(i,j+1,k),   &
+                                            ux1_halo(i+1,j+1,k), &
+                                            ux1_halo(i,j+1,k+1), &
+                                            ux1_halo(i+1,j+1,k+1))
               pa%v(2)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
                                             pa%x(1),pa%x(2),pa%x(3),      &
-                                            uy1_hal2(i,j,k),     &
-                                            uy1_hal2(i+1,j,k),   &
-                                            uy1_hal2(i,j,k+1),   &
-                                            uy1_hal2(i+1,j,k+1), &
-                                            uy1_hal2(i,j+1,k),   &
-                                            uy1_hal2(i+1,j+1,k), &
-                                            uy1_hal2(i,j+1,k+1), &
-                                            uy1_hal2(i+1,j+1,k+1)) 
+                                            uy1_halo(i,j,k),     &
+                                            uy1_halo(i+1,j,k),   &
+                                            uy1_halo(i,j,k+1),   &
+                                            uy1_halo(i+1,j,k+1), &
+                                            uy1_halo(i,j+1,k),   &
+                                            uy1_halo(i+1,j+1,k), &
+                                            uy1_halo(i,j+1,k+1), &
+                                            uy1_halo(i+1,j+1,k+1)) 
               pa%v(3)=trilinear_interpolation( x1,y1,z1,            &
                                             x2,y2,z2,            &
                                             pa%x(1),pa%x(2),pa%x(3),      &
-                                            uz1_hal2(i,j,k),     &
-                                            uz1_hal2(i+1,j,k),   &
-                                            uz1_hal2(i,j,k+1),   &
-                                            uz1_hal2(i+1,j,k+1), &
-                                            uz1_hal2(i,j+1,k),   &
-                                            uz1_hal2(i+1,j+1,k), &
-                                            uz1_hal2(i,j+1,k+1), &
-                                            uz1_hal2(i+1,j+1,k+1)) 
+                                            uz1_halo(i,j,k),     &
+                                            uz1_halo(i+1,j,k),   &
+                                            uz1_halo(i,j,k+1),   &
+                                            uz1_halo(i+1,j,k+1), &
+                                            uz1_halo(i,j+1,k),   &
+                                            uz1_halo(i+1,j+1,k), &
+                                            uz1_halo(i,j+1,k+1), &
+                                            uz1_halo(i+1,j+1,k+1)) 
               !
+              ! if(nrank==1 .and. jpart==403) then
+              !   print*,'**',i,j,k
+              !   print*,pa%x,'~',pa%v
+              !   print*,ux1_hal2(i,j,k),ux1_hal2(i,j,k+1),'xx',ux1_halo(i,j,k),ux1_halo(i,j,k+1),ux1_halo(i,j,k+2)
+              ! endif
               ! print*,p,ypa(p),':',ux_pa(p),uy_pa(p),uz_pa(p)
               !
               exit loopk
@@ -744,7 +811,7 @@ module partack
     !
     deallocate(xcor,dxco)
     !
-    call partical_domain_check
+    call partical_domain_check('bc_channel')
     !
     call partical_swap
     !
@@ -780,9 +847,11 @@ module partack
   !| -------------                                                     |
   !| 16-06-2022  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine partical_domain_check
+  subroutine partical_domain_check(mode)
     !
     use param,     only : nclx,ncly,nclz,xlx,yly,zlz
+    !
+    character(len=*),intent(in) :: mode
     !
     ! local data 
     integer :: jpart,npart,psize,jrank,npcanc,npcanc_totl
@@ -793,72 +862,180 @@ module partack
     !
     psize=msize(particle)
     !
-    npart=0
-    npcanc=0
-    do jpart=1,psize
+    if(mode=='out_disappear') then
       !
-      pa=>particle(jpart)
-      !
-      if(pa%new) cycle
-      !
-      npart=npart+1
-      if(npart>numparticle) exit
-      ! if the particle is out of domain, mark it and subscribe the 
-      ! total number of particles
-      !
-      if(nclx .and. (pa%x(1)>xlx .or. pa%x(1)<0)) then
-        call pa%reset()
-        npcanc=npcanc+1
-        cycle
-      endif
-      !
-      if(ncly .and. (pa%x(2)>yly .or. pa%x(2)<0)) then
-        call pa%reset()
-        npcanc=npcanc+1
-        cycle
-      endif
-      !
-      if(nclz .and. (pa%x(3)>zlz .or. pa%x(3)<0)) then
-        call pa%reset()
-        npcanc=npcanc+1
-        cycle
-      endif
-      !
-      if( pa%x(1)>=lxmin(nrank) .and. pa%x(1)<lxmax(nrank) .and. &
-          pa%x(2)>=lymin(nrank) .and. pa%x(2)<lymax(nrank) .and. &
-          pa%x(3)>=lzmin(nrank) .and. pa%x(3)<lzmax(nrank) ) then
-        continue
-      else
+      npart=0
+      npcanc=0
+      do jpart=1,psize
         !
-        pa%swap=.true.
+        pa=>particle(jpart)
         !
-        do jrank=0,nproc-1
+        if(pa%new) cycle
+        !
+        npart=npart+1
+        if(npart>numparticle) exit
+        ! if the particle is out of domain, mark it and subscribe the 
+        ! total number of particles
+        !
+        if(nclx .and. (pa%x(1)>xlx .or. pa%x(1)<0)) then
+          call pa%reset()
+          npcanc=npcanc+1
+          cycle
+        endif
+        !
+        if(ncly .and. (pa%x(2)>yly .or. pa%x(2)<0)) then
+          call pa%reset()
+          npcanc=npcanc+1
+          cycle
+        endif
+        !
+        if(nclz .and. (pa%x(3)>zlz .or. pa%x(3)<0)) then
+          call pa%reset()
+          npcanc=npcanc+1
+          cycle
+        endif
+        !
+        if( pa%x(1)>=lxmin(nrank) .and. pa%x(1)<lxmax(nrank) .and. &
+            pa%x(2)>=lymin(nrank) .and. pa%x(2)<lymax(nrank) .and. &
+            pa%x(3)>=lzmin(nrank) .and. pa%x(3)<lzmax(nrank) ) then
+          continue
+        else
           !
-          ! to find which rank the particle are moving to and 
-          ! mark
-          if(jrank==nrank) cycle
+          pa%swap=.true.
           !
-          if( pa%x(1)>=lxmin(jrank) .and. pa%x(1)<lxmax(jrank) .and. &
-              pa%x(2)>=lymin(jrank) .and. pa%x(2)<lymax(jrank) .and. &
-              pa%x(3)>=lzmin(jrank) .and. pa%x(3)<lzmax(jrank) ) then
+          do jrank=0,nproc-1
             !
-            pa%rank2go=jrank
+            ! to find which rank the particle are moving to and 
+            ! mark
+            if(jrank==nrank) cycle
             !
-            exit
+            if( pa%x(1)>=lxmin(jrank) .and. pa%x(1)<lxmax(jrank) .and. &
+                pa%x(2)>=lymin(jrank) .and. pa%x(2)<lymax(jrank) .and. &
+                pa%x(3)>=lzmin(jrank) .and. pa%x(3)<lzmax(jrank) ) then
+              !
+              pa%rank2go=jrank
+              !
+              exit
+              !
+            endif
             !
+          enddo
+          !
+        endif
+        !
+      enddo
+      !
+      numparticle=numparticle-npcanc
+      !
+      npcanc_totl=psum(npcanc)
+      if(nrank==0 .and. npcanc_totl>0) print*,' ** ',npcanc_totl,        &
+                                     ' particles are moving out of domain'
+      !
+    elseif(mode=='bc_channel') then
+      !
+      npart=0
+      npcanc=0
+      do jpart=1,psize
+        !
+        pa=>particle(jpart)
+        !
+        if(pa%new) cycle
+        !
+        npart=npart+1
+        !
+        if(npart>numparticle) exit
+        ! if the particle is out of domain, mark it and subscribe the 
+        ! total number of particles
+        !
+        if(nclx) then
+          !
+          if(pa%x(1)>xlx) then
+            pa%x(1)=pa%x(1)-xlx
           endif
           !
-        enddo
+          if(pa%x(1)<0) then
+            pa%x(1)=pa%x(1)+xlx
+          endif
+          !
+        endif
         !
-      endif
+        if(ncly) then
+          !
+          if(pa%x(2)>yly) then
+            pa%x(2)=pa%x(2)-yly
+          endif 
+          !
+          if(pa%x(2)<0) then
+            pa%x(2)=pa%x(2)+yly
+          endif
+          !
+        else
+          !
+          ! reflect particles back in the domain.
+          if(pa%x(2)>yly) then
+            pa%x(2)=2.d0*yly-pa%x(2)
+          endif
+          if(pa%x(2)<0) then
+            pa%x(2)=-pa%x(2)
+          endif
+          !
+        endif
+        !
+        if(nclz) then
+          !
+          if(pa%x(3)>zlz) then
+            pa%x(3)=pa%x(3)-zlz
+          endif 
+          !
+          if(pa%x(3)<0) then
+            pa%x(3)=pa%x(3)+zlz
+          endif
+          !
+        endif
+        !
+        if(pa%x(1)>xlx .or. pa%x(1)<0 .or. &
+           pa%x(2)>yly .or. pa%x(2)<0 .or. &
+           pa%x(3)>zlz .or. pa%x(3)<0 ) then
+            print*,' !! waring, the particle still moves out of domain'
+            print*,nrank,jpart,pa%x(:)
+            stop
+        endif
+        !
+        if( pa%x(1)>=lxmin(nrank) .and. pa%x(1)<lxmax(nrank) .and. &
+            pa%x(2)>=lymin(nrank) .and. pa%x(2)<lymax(nrank) .and. &
+            pa%x(3)>=lzmin(nrank) .and. pa%x(3)<lzmax(nrank) ) then
+          continue
+        else
+          !
+          pa%swap=.true.
+          !
+          do jrank=0,nproc-1
+            !
+            ! to find which rank the particle are moving to and 
+            ! mark
+            if(jrank==nrank) cycle
+            !
+            if( pa%x(1)>=lxmin(jrank) .and. pa%x(1)<lxmax(jrank) .and. &
+                pa%x(2)>=lymin(jrank) .and. pa%x(2)<lymax(jrank) .and. &
+                pa%x(3)>=lzmin(jrank) .and. pa%x(3)<lzmax(jrank) ) then
+              !
+              pa%rank2go=jrank
+              !
+              exit
+              !
+            endif
+            !
+          enddo
+          !
+        endif
+        !
+      enddo
       !
-    enddo
-    !
-    numparticle=numparticle-npcanc
-    !
-    npcanc_totl=psum(npcanc)
-    if(nrank==0 .and. npcanc_totl>0) print*,' ** ',npcanc_totl,        &
-                                   ' particles are moving out of domain'
+    else
+      !
+      stop ' !! mode not defined @ partical_domain_check!!'
+      !
+    endif
     !
     part_dmck_time=part_dmck_time+ptime()-timebeg
     ! print*,nrank,'|',numparticle
@@ -2090,6 +2267,177 @@ module partack
                                                     mpi_comm_world,ierr)
     !
   end function pmax_int
+  !
+  subroutine pswap_yz(varin,varout)
+    !
+    use variables, only : p_row, p_col
+    use decomp_2d, only : xsize
+    use param,     only : nclx,ncly,nclz
+    use mpi
+    !
+    ! arguments
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(in) :: varin
+    real(mytype),allocatable,intent(out) :: varout(:,:,:)
+    !
+    ! local data
+    integer :: i,j,k,n,jrk,krk,ncou,mpitag,ierr
+    integer :: status(mpi_status_size) 
+    integer,allocatable,save :: mrank(:,:)
+    integer,save :: upper,lower,front,bback
+    logical,save :: init=.true.
+    real(mytype),dimension(:,:),allocatable :: sbuf1,sbuf2,rbuf1,rbuf2
+    !
+    if(init) then
+      !
+      allocate(mrank(p_row,p_col))
+      !
+      n=-1
+      do j=1,p_row
+      do k=1,p_col
+        !
+        n=n+1
+        mrank(j,k)=n
+        !
+        if(nrank==n) then
+          jrk=j
+          krk=k
+        endif
+        !
+      enddo
+      enddo
+      !
+      if(jrk==1) then
+        upper=mrank(jrk+1,krk)
+        !
+        if(ncly) then
+          lower=mrank(p_row,krk)
+        else
+          lower=mpi_proc_null
+        endif
+        !
+      elseif(jrk==p_row) then
+        !
+        if(ncly) then
+          upper=mrank(1,krk)
+        else
+          upper=mpi_proc_null
+        endif
+        !
+        lower=mrank(jrk-1,krk)
+      else
+        upper=mrank(jrk+1,krk)
+        lower=mrank(jrk-1,krk)
+      endif
+      !
+      if(krk==1) then
+        front=mrank(jrk,krk+1)
+        !
+        if(nclz) then
+          bback=mrank(jrk,p_col)
+        else
+          bback=mpi_proc_null
+        endif
+        !
+      elseif(krk==p_col) then
+        if(nclz) then
+          front=mrank(jrk,1)
+        else
+          front=mpi_proc_null
+        endif
+        !
+        bback=mrank(jrk,krk-1)
+      else
+        front=mrank(jrk,krk+1)
+        bback=mrank(jrk,krk-1)
+      endif
+      !
+      ! print*,nrank,'-',jrk,krk,':',upper,lower,front,bback,mpi_proc_null
+      !
+      init=.false.
+      !
+    endif
+    !
+    allocate(varout(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1))
+    !
+    varout(1:xsize(1),1:xsize(2),1:xsize(3))=varin(1:xsize(1),1:xsize(2),1:xsize(3))
+    !
+    mpitag=1000
+    !
+    ! send & recv in the z direction
+    allocate(sbuf1(1:xsize(1),1:xsize(2)),sbuf2(1:xsize(1),1:xsize(2)),&
+             rbuf1(1:xsize(1),1:xsize(2)),rbuf2(1:xsize(1),1:xsize(2)))
+    !
+    if(front .ne. mpi_proc_null) then
+      sbuf1(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),xsize(3))
+    endif
+    if(bback .ne. mpi_proc_null) then
+      sbuf2(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),1)
+    endif
+    !
+    ncou=xsize(1)*xsize(2)
+    !
+    ! Message passing
+    call mpi_sendrecv(sbuf1,ncou,mpi_real8,front, mpitag,             &
+                      rbuf1,ncou,mpi_real8,bback, mpitag,             &
+                                             mpi_comm_world,status,ierr)
+    mpitag=mpitag+1
+    call mpi_sendrecv(sbuf2,ncou,mpi_real8,bback, mpitag,            &
+                      rbuf2,ncou,mpi_real8,front, mpitag,            &
+                                             mpi_comm_world,status,ierr)
+    !
+    if(bback .ne. mpi_proc_null) then
+      varout(1:xsize(1),1:xsize(2),0)=rbuf1(1:xsize(1),1:xsize(2))
+    endif
+    if(front .ne. mpi_proc_null) then
+      varout(1:xsize(1),1:xsize(2),xsize(3)+1)=rbuf2(1:xsize(1),1:xsize(2))
+    endif
+    !
+    deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
+    !
+    ! end of Message passing in the z direction
+    !
+    ! 
+    ! send & recv in the y direction
+    allocate( sbuf1(1:xsize(1),0:xsize(3)+1),                          &
+              sbuf2(1:xsize(1),0:xsize(3)+1),                          &
+              rbuf1(1:xsize(1),0:xsize(3)+1),                          &
+              rbuf2(1:xsize(1),0:xsize(3)+1) )
+
+    if(upper .ne. mpi_proc_null) then
+      sbuf1(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),xsize(2),0:xsize(3)+1)
+    endif
+    if(lower .ne. mpi_proc_null) then
+      sbuf2(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),1,0:xsize(3)+1)
+    endif
+    !
+    ncou=xsize(1)*(xsize(3)+2)
+    !
+    ! Message passing
+    call mpi_sendrecv(sbuf1,ncou,mpi_real8,upper, mpitag,             &
+                      rbuf1,ncou,mpi_real8,lower, mpitag,             &
+                                             mpi_comm_world,status,ierr)
+    mpitag=mpitag+1
+    call mpi_sendrecv(sbuf2,ncou,mpi_real8,lower, mpitag,            &
+                      rbuf2,ncou,mpi_real8,upper, mpitag,            &
+                                             mpi_comm_world,status,ierr)
+    !
+    if(upper .ne. mpi_proc_null) then
+      varout(1:xsize(1),xsize(2)+1,0:xsize(3)+1)=rbuf2(1:xsize(1),0:xsize(3)+1)
+    endif
+    if(lower .ne. mpi_proc_null) then
+      varout(1:xsize(1),0,0:xsize(3)+1)=rbuf1(1:xsize(1),0:xsize(3)+1)
+    endif
+    !
+    deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
+    ! send & recv in the y direction
+    !
+    if(nclx) then
+      varout(xsize(1)+1,:,:)=varout(1,:,:)
+    endif
+    !
+    return
+    !
+  end subroutine pswap_yz
   !
 end module partack
 !+---------------------------------------------------------------------+
