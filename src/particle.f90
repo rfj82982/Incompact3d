@@ -54,6 +54,14 @@ module partack
     !
   end Interface h5write
   !
+  Interface h5sread
+    !
+    module procedure h5_readarray1d
+    module procedure h5_read1rl8
+    module procedure h5_read1int
+    !
+  end Interface h5sread
+  !
   interface pgather
     module procedure pgather_int
   end interface
@@ -86,7 +94,7 @@ module partack
   type(partype),allocatable,target :: particle(:)
   !
   logical :: lpartack
-  integer :: numparticle,ipartiout,ipartiadd
+  integer :: numparticle,ipartiout,ipartiadd,particle_file_numb
   real(mytype) :: partirange(6)
   integer :: numpartix(3)
   real(mytype),allocatable,dimension(:) :: lxmin,lxmax,lymin,lymax,lzmin,lzmax
@@ -278,21 +286,31 @@ module partack
   !+-------------------------------------------------------------------+
   subroutine init_particle
     !
-    use param,     only : xlx,yly,zlz
+    use param,     only : xlx,yly,zlz,irestart
     use var,       only : itime
     !
     ! local data
     integer :: i,j,k,p
     real(mytype) :: dx,dy,dz
     !
-    call particle_gen(particle,numparticle)
+    if(irestart==0) then
+      !
+      call particle_gen(particle,numparticle)
+      !
+      particle_file_numb=0
+      !
+      call h5write_particle()
+      !
+    else
+      call h5read_particle(particle,numparticle)
+    endif
     !
-    ! call partical_domain_check
-    ! !
+    call partical_domain_check('bc_channel')
+    !
+    !
     ! call partical_swap
     !
     ! call write_particle()
-    call h5write_particle()
     !
     part_time=0.d0
     part_comm_time=0.d0
@@ -1339,6 +1357,68 @@ module partack
   ! The end of the subroutine write_particle                           |
   !+-------------------------------------------------------------------+
   !
+  subroutine h5read_particle(particle_new,particle_size)
+    !
+    use param, only : t,itime
+    !
+    ! argument
+    type(partype),intent(out),allocatable :: particle_new(:)
+    integer,intent(out) :: particle_size
+    !
+    ! local data
+    character(len=5) :: num
+    character(len=32) :: file2read
+    integer :: nstep,psize,jp
+    real(mytype) :: time
+    real(8),allocatable :: xpart(:),ypart(:),zpart(:)
+    !
+    if(nrank==0) then
+      !
+      write(num,'(I5.5)') particle_file_numb
+      !
+      file2read='./data/particle'//num//'.h5'
+      !
+      call h5sread(var=nstep,varname='itime',filename=trim(file2read),explicit=.true.)
+      !
+      if(nstep .ne. itime) then
+        print*,' the itime from the particle file ',trim(file2read),   &
+                                  'not consistent with the restart file'
+        stop ' !! ERROR @ h5read_particle'
+      endif
+      !
+      call h5sread(var=time,varname='time',filename=trim(file2read),explicit=.true.)
+      print*,' ** time: ',time
+      !
+      psize=h5getdim3d(varname='x',filenma=trim(file2read))
+      print*,' ** number of particles: ',psize
+      !
+      allocate(xpart(psize),ypart(psize),zpart(psize))
+      call h5sread(var=xpart,varname='x',dim=psize,filename=trim(file2read),explicit=.true.)
+      call h5sread(var=ypart,varname='y',dim=psize,filename=trim(file2read),explicit=.true.)
+      call h5sread(var=zpart,varname='z',dim=psize,filename=trim(file2read),explicit=.true.)
+      !
+      allocate(particle_new(1:psize))
+      !
+      do jp=1,psize
+        !
+        call particle_new(jp)%init()
+        !
+        particle_new(jp)%x(1)=xpart(jp)
+        particle_new(jp)%x(2)=ypart(jp)
+        particle_new(jp)%x(3)=zpart(jp)
+        !
+        particle_new(jp)%new=.false.
+        !
+      enddo
+      !
+      particle_size=psize
+      !
+    else
+      particle_size=0
+    endif
+    !
+  end subroutine h5read_particle
+  !
   !+-------------------------------------------------------------------+
   !| This subroutine is to write particles via HDF5.                   |
   !+-------------------------------------------------------------------+
@@ -1350,16 +1430,18 @@ module partack
   !+-------------------------------------------------------------------+
   subroutine h5write_particle()
     !
-    use param, only : t
+    use param, only : t,itime,irestart
     !
     ! local data
-    character(len=3) :: num
-    real(8),allocatable :: xpart(:),ypart(:),zpart(:)
+    character(len=5) :: num
+    real(8),allocatable :: xpart(:),ypart(:),zpart(:),                 &
+                           upart(:),vpart(:),wpart(:)
     integer :: psize,total_num_part,p,j
     integer :: rank2coll
     character(len=32) :: file2write
     real(8) :: timebeg
-    integer,save :: itime=0
+    logical :: fexists
+    !
     logical,save :: init=.true.
     !
     timebeg=ptime()
@@ -1368,16 +1450,24 @@ module partack
       !
       ! write head of the xdmf file
       if(nrank==0) then
-        open(22,file='./visu_particle.xdmf',form='formatted')
-        write(22,'(A)')'<?xml version="1.0" encoding="UTF-8" ?>'
-        write(22,'(A)')'<Xdmf Version="3.0" xmlns:xi="http://www.w3.org/2001/XInclude">'
-        write(22,'(A)')'<Domain>'
-        write(22,'(A)')'  <Grid Name="Particle" GridType="Collection" CollectionType="Temporal">'
-        write(22,'(A)')'  </Grid>'
-        write(22,'(A)')'</Domain>'
-        write(22,'(A)')'</Xdmf>'
-        close(22)
-        print*,' << visu_particle.xdmf'
+        !
+        inquire(file='./visu_particle.xdmf', exist=fexists)
+        !
+        if(fexists .and. irestart.ne.0) then
+          continue
+        else
+          open(22,file='./visu_particle.xdmf',form='formatted')
+          write(22,'(A)')'<?xml version="1.0" encoding="UTF-8" ?>'
+          write(22,'(A)')'<Xdmf Version="3.0" xmlns:xi="http://www.w3.org/2001/XInclude">'
+          write(22,'(A)')'<Domain>'
+          write(22,'(A)')'  <Grid Name="Particle" GridType="Collection" CollectionType="Temporal">'
+          write(22,'(A)')'  </Grid>'
+          write(22,'(A)')'</Domain>'
+          write(22,'(A)')'</Xdmf>'
+          close(22)
+          print*,' << visu_particle.xdmf'
+        endif
+        !
       endif
       !
       init=.false.
@@ -1387,6 +1477,7 @@ module partack
     if(numparticle>0) then
       !
       allocate(xpart(numparticle),ypart(numparticle),zpart(numparticle))
+      allocate(upart(numparticle),vpart(numparticle),wpart(numparticle))
       !
       psize=msize(particle)
       j=0
@@ -1398,6 +1489,10 @@ module partack
         xpart(j)=particle(p)%x(1)
         ypart(j)=particle(p)%x(2)
         zpart(j)=particle(p)%x(3)
+        !
+        upart(j)=particle(p)%v(1)
+        vpart(j)=particle(p)%v(2)
+        wpart(j)=particle(p)%v(3)
         !
       enddo
       !
@@ -1413,16 +1508,17 @@ module partack
     !
     ! print*,' ** size of the particel comm:',mpi_size_part
     !
-    itime=pmax(itime)
+    particle_file_numb=particle_file_numb+1
     !
     if(rank2coll>=0) then
       !
-      write(num,'(I3.3)') itime
+      write(num,'(I5.5)') particle_file_numb
       !
       file2write='./data/particle'//num//'.h5'
       call h5io_init(filename=trim(file2write),mode='writ',            &
                                                  comm=mpi_comm_particle)
       !
+      call h5write(varname='itime',var=itime)
       call h5write(varname='time',var=t)
       call h5write(varname='x',var=xpart,total_size=total_num_part,    &
                                                comm=mpi_comm_particle, &
@@ -1436,11 +1532,27 @@ module partack
                                                comm=mpi_comm_particle, &
                                           comm_size=mpi_size_part,     &
                                           comm_rank=mpi_rank_part)
-      deallocate(xpart,ypart,zpart)
+      call h5write(varname='u',var=upart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
+      call h5write(varname='v',var=vpart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
+      call h5write(varname='w',var=wpart,total_size=total_num_part,    &
+                                               comm=mpi_comm_particle, &
+                                          comm_size=mpi_size_part,     &
+                                          comm_rank=mpi_rank_part)
+      !
+      deallocate(xpart,ypart,zpart,upart,vpart,wpart)
       !
       call h5io_end
       !
       if(mpi_rank_part==0) then
+        !
+        print*,' << ',trim(file2write)
+        !
         open(22,file='./visu_particle.xdmf',form='formatted',position="append")
         backspace(22)
         backspace(22)
@@ -1467,8 +1579,6 @@ module partack
         close(22)
         print*,' << visu_particle.xdmf'
       endif
-      !
-      itime=itime+1
       !
     endif
     !
@@ -2439,6 +2549,192 @@ module partack
     !
   end subroutine pswap_yz
   !
+  !+-------------------------------------------------------------------+
+  !| This subroutine is used to read 1-D array via hdf5 interface.     |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 31-03-2022  | Created by J. Fang @ Warrington                     |
+  !+-------------------------------------------------------------------+
+  subroutine h5_readarray1d(varname,var,dim,filename,explicit)
+    !
+    !
+    real(8),intent(out) :: var(:)
+    integer,intent(in) :: dim
+    character(len=*),intent(in) :: varname,filename
+    logical,intent(in), optional:: explicit
+    logical :: lexplicit
+    !
+    integer(hid_t) :: file_id
+    ! file identifier
+    integer(hid_t) :: dset_id1
+    ! dataset identifier
+    integer :: h5error ! error flag
+    integer(hsize_t) :: dimt(1)
+    !
+    if (present(explicit)) then
+       lexplicit = explicit
+    else
+       lexplicit = .true.
+    end if
+    !
+    call h5open_f(h5error)
+    !
+    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
+
+    ! open an existing dataset.
+    call h5dopen_f(file_id,varname,dset_id1,h5error)
+    !
+    dimt=(/dim/)
+    !
+    ! read the dataset.
+    call h5dread_f(dset_id1,h5t_native_double,var,dimt,h5error)
+
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 1'
+    !
+    ! close the dataset
+    call h5dclose_f(dset_id1, h5error)
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 2'
+    ! close the file.
+    call h5fclose_f(file_id, h5error)
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 3'
+    !
+    ! close fortran interface.
+    call h5close_f(h5error)
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 4'
+    !
+    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
+    !
+  end subroutine h5_readarray1d
+  !
+  subroutine h5_read1int(var,varname,filename,explicit)
+    !
+    integer,intent(out) :: var
+    character(len=*),intent(in) :: varname,filename
+    logical,intent(in), optional:: explicit
+    logical :: lexplicit
+    !
+    integer(hid_t) :: file_id
+    ! file identifier
+    integer(hid_t) :: dset_id1
+    ! dataset identifier
+    integer :: v(1)
+    integer :: h5error ! error flag
+    integer(hsize_t) :: dimt(1)
+    !
+    if (present(explicit)) then
+       lexplicit = explicit
+    else
+       lexplicit = .true.
+    end if
+    !
+    dimt=(/1/)
+    !
+    call h5open_f(h5error)
+    print*,' ** open hdf5 interface'
+    !
+    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
+    !
+    call h5ltread_dataset_f(file_id,varname,h5t_native_integer,v,dimt,h5error)
+    !
+    call h5fclose_f(file_id,h5error)
+    !
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 1'
+    !
+    ! close fortran interface.
+    call h5close_f(h5error)
+    !
+    var=v(1)
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 2'
+    !
+    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
+    !
+  end subroutine h5_read1int
+  !
+  subroutine h5_read1rl8(var,varname,filename,explicit)
+    !
+    real(8),intent(out) :: var
+    character(len=*),intent(in) :: varname,filename
+    logical,intent(in), optional:: explicit
+    logical :: lexplicit
+    !
+    integer(hid_t) :: file_id
+    ! file identifier
+    integer(hid_t) :: dset_id1
+    ! dataset identifier
+    real(8) :: v(1)
+    integer :: h5error ! error flag
+    integer(hsize_t) :: dimt(1)
+    !
+    if (present(explicit)) then
+       lexplicit = explicit
+    else
+       lexplicit = .true.
+    end if
+    !
+    dimt=(/1/)
+    !
+    call h5open_f(h5error)
+    if(lexplicit)  print*,' ** open hdf5 interface'
+    !
+    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
+    !
+    call h5ltread_dataset_f(file_id,varname,h5t_native_double,v,dimt,h5error)
+    !
+    call h5fclose_f(file_id,h5error)
+    !
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 1'
+    !
+    ! close fortran interface.
+    call h5close_f(h5error)
+    !
+    var=v(1)
+    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 2'
+    !
+    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
+    !
+    !
+  end subroutine h5_read1rl8
+  !+-------------------------------------------------------------------+
+  !| This end of the subroutine h5_readarray1d.                        |
+  !+-------------------------------------------------------------------+
+  !!
+  !+-------------------------------------------------------------------+
+  !| This function is used to get the dimension of the hdf5 array.     |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 30-JuL-2020 | Coped from ASTR Post by J. Fang STFC Daresbury Lab. |
+  !+-------------------------------------------------------------------+
+  function h5getdim3d(varname,filenma) result(dims)
+    !
+    character(len=*),intent(in) :: varname,filenma
+    integer :: dims
+    !
+    ! local data
+    integer(hid_t)  :: file, space, dset
+    integer(hsize_t) :: ndims(1)
+    integer         :: h5error ! error flag
+    integer(hsize_t) :: dims_h5(1)
+    !
+    !
+    call h5open_f(h5error)
+    call h5fopen_f(filenma,h5f_acc_rdonly_f,file,h5error)
+    call h5dopen_f (file,varname,dset, h5error)
+    call h5dget_space_f(dset, space, h5error)
+    call h5sget_simple_extent_dims_f(space,dims_h5,ndims,h5error)
+    !
+    dims=dims_h5(1)
+    !
+    call h5dclose_f(dset , h5error)
+    call h5sclose_f(space, h5error)
+    call h5fclose_f(file , h5error)
+    call h5close_f(h5error)
+    !
+  end function h5getdim3d
+  !+-------------------------------------------------------------------+
+  !| This end of the function h5getdim3d.                              |
+  !+-------------------------------------------------------------------+
 end module partack
 !+---------------------------------------------------------------------+
 ! The end of the module partack                                        |

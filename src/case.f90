@@ -234,8 +234,6 @@ contains
 
     use turbine, only : turbine_output
     use probes, only : write_probes
-    use partack,only : lpartack,write_particle,h5write_particle,ipartiout,numparticle, & 
-                        partile_inject,numpartix
 
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)), intent(in) :: ux1, uy1, uz1
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),numscalar), intent(in) :: phi1
@@ -277,14 +275,6 @@ contains
     endif
 
     call write_probes(ux1, uy1, uz1, pp3, phi1)
-
-    if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
-      !
-      call h5write_particle()
-      !
-      ! call partile_inject()
-      !
-    endif
 
   end subroutine postprocessing
   !##################################################################

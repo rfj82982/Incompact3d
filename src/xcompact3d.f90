@@ -49,7 +49,8 @@ program xcompact3d
   use ibm_param
   use ibm, only : body
   use genepsi, only : genepsi3d
-  use partack,only : lpartack,particle_velo
+  use partack,only : lpartack,particle_velo,write_particle,h5write_particle, &
+                     ipartiout,numparticle, partile_inject,numpartix
 #ifdef DEBG 
   use tools, only : avg3d
 #endif
@@ -117,7 +118,15 @@ program xcompact3d
         call test_flow(rho1,ux1,uy1,uz1,phi1,ep1,drho1,divu3)
 
      enddo !! End sub timesteps
-
+     !
+     if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
+       !
+       call h5write_particle()
+       !
+       ! call partile_inject()
+       !
+     endif
+     !
      call restart(ux1,uy1,uz1,dux1,duy1,duz1,ep1,pp3(:,:,:,1),phi1,dphi1,px1,py1,pz1,rho1,drho1,mu1,1)
 
      call simu_stats(3)

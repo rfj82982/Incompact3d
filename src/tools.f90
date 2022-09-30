@@ -210,6 +210,7 @@ contains
     use param
     use MPI
     use navier, only : gradp
+    use partack,only : lpartack,particle_file_numb
 
     implicit none
 
@@ -234,6 +235,7 @@ contains
     character(len=80) :: varname
     NAMELIST /Time/ tfield, itime
     NAMELIST /NumParam/ nx, ny, nz, istret, beta, dt, itimescheme
+    NAMELIST /PartiParam/ particle_file_numb
 
     write(filename,"('restart',I7.7)") itime
     write(filestart,"('restart',I7.7)") ifirst-1
@@ -337,6 +339,15 @@ contains
          write(111,'(A,I14)') 'itimescheme=',itimescheme
          write(111,fmt2) 'iimplicit=',iimplicit
          write(111,'(A)')'/End'
+
+         if(lpartack) then
+           write(111,'(A)')'!========================='
+           write(111,'(A)')'&PartiParam'
+           write(111,'(A)')'!========================='
+           write(111,fmt2) 'particle_file_numb=   ',particle_file_numb
+           write(111,'(A)')'/End'
+         endif
+
          write(111,'(A)')'!========================='
 
          close(111)
@@ -419,9 +430,13 @@ contains
        if (fexists) then
          open(111, file=filename)
          read(111, nml=Time)
+         !
+         if(lpartack) read(111, nml=PartiParam)
+         !
          close(111)
          t0 = tfield
          itime0 = 0
+         !
        else
          t0 = zero
          itime0 = ifirst-1
