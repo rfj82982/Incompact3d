@@ -218,10 +218,10 @@ contains
 #ifndef ADIOS2
     if (filenamedigits) then
        ! New enumeration system, it works integrated with xcompact3d_toolbox
-       write(num, ifilenameformat) itime
+       write(num, '(I4.4)') itime
     else
        ! Classic enumeration system
-       write(num, ifilenameformat) itime/ioutput
+       write(num, '(I4.4)') itime/ioutput
     endif
 #else
     ! ADIOS2 is zero-indexed

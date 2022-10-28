@@ -210,7 +210,7 @@ contains
     use param
     use MPI
     use navier, only : gradp
-    use partack,only : lpartack,particle_file_numb
+    use partack,only : lpartack,particle_file_numb,ptime
 
     implicit none
 
@@ -226,6 +226,7 @@ contains
     real(mytype), dimension(xsize(1),xsize(2),xsize(3),ntime) :: drho1
     real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: mu1
     real(mytype) :: xdt,tfield,y
+    real(mytype) :: time_io,time_beg
     integer, dimension(2) :: dims, dummy_coords
     logical, dimension(2) :: dummy_periods
     logical :: fexists
@@ -257,6 +258,9 @@ contains
     end if
 
     if (iresflg==1) then !write
+       !
+       time_beg=ptime()
+       !
        call decomp_2d_open_io(io_restart, resfile, decomp_2d_write_mode)
        call decomp_2d_start_io(io_restart, resfile)
 
@@ -352,6 +356,13 @@ contains
 
          close(111)
        end if
+       !
+       time_io=ptime()-time_beg
+       !
+       if (nrank == 0) then
+         print*,' ** time cost for writting restart files:',time_io
+       endif
+       !
     else
        if (nrank==0) then
          write(*,*)'==========================================================='

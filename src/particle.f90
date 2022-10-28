@@ -1378,16 +1378,16 @@ module partack
       !
       file2read='./data/particle'//num//'.h5'
       !
-      call h5sread(var=nstep,varname='itime',filename=trim(file2read),explicit=.true.)
-      !
-      if(nstep .ne. itime) then
-        print*,' the itime from the particle file ',trim(file2read),   &
-                                  'not consistent with the restart file'
-        stop ' !! ERROR @ h5read_particle'
-      endif
-      !
-      call h5sread(var=time,varname='time',filename=trim(file2read),explicit=.true.)
-      print*,' ** time: ',time
+      ! call h5sread(var=nstep,varname='itime',filename=trim(file2read),explicit=.true.)
+      ! !
+      ! if(nstep .ne. itime) then
+      !   print*,' the itime from the particle file ',trim(file2read),   &
+      !                             'not consistent with the restart file'
+      !   stop ' !! ERROR @ h5read_particle'
+      ! endif
+      ! !
+      ! call h5sread(var=time,varname='time',filename=trim(file2read),explicit=.true.)
+      ! print*,' ** time: ',time
       !
       psize=h5getdim3d(varname='x',filenma=trim(file2read))
       print*,' ** number of particles: ',psize

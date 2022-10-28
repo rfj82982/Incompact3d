@@ -364,7 +364,7 @@ subroutine finalise_xcompact3d()
   call decomp_2d_finalize
   CALL MPI_FINALIZE(ierr)
 
-endsubroutine finalise_xcompact3d
+end subroutine finalise_xcompact3d
 
 subroutine check_transients()
 
