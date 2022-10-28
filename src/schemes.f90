@@ -15,6 +15,7 @@ subroutine schemes()
   USE variables
   USE var
   USE ydiff_implicit, only : init_implicit, implicit_schemes
+  use mhd, only: mhd_active
 
   implicit none
 
@@ -94,7 +95,7 @@ subroutine schemes()
        alsakz,askz,bskz,cskz,dskz,&
        sfz,ssz,swz,sfzp,sszp,swzp,dz2,nz,nclz1,nclzn)
 
-  if (iscalar.ne.0 .or. (ilmn)) then
+  if (iscalar.ne.0 .or. (ilmn) .or. mhd_active) then
      !Scalar
      ! First derivative
      if (nclxS1.eq.0.and.nclxSn.eq.0) derxS => derx_00

@@ -177,6 +177,8 @@ subroutine init_xcompact3d()
 
   use partack, only: lpartack,local_domain_size,init_particle
 
+  use mhd, only: mhd_active,mhd_init
+
   implicit none
 
   integer :: ierr
@@ -299,6 +301,10 @@ subroutine init_xcompact3d()
     call local_domain_size()
     !
     call init_particle()
+  endif
+
+  if(mhd_active) then
+    call mhd_init()
   endif
 
   call simu_stats(1)

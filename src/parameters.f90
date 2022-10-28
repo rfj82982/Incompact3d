@@ -34,6 +34,7 @@ subroutine parameter(input_i3d)
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
 
   use partack, only: numparticle,lpartack,partirange,ipartiout,numpartix
+  use mhd, only: mhd_active,hartmann
 
   implicit none
 
@@ -76,6 +77,7 @@ subroutine parameter(input_i3d)
   NAMELIST/ALMParam/iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange
+  NAMELIST/MHDParam/mhd_active,hartmann
 
 #ifdef DEBG
   if (nrank == 0) write(*,*) '# parameter start'
@@ -192,6 +194,7 @@ subroutine parameter(input_i3d)
   endif
 
   read(10, nml=PartiParam); rewind(10) !! read particle 
+  read(10, nml=MHDParam); rewind(10) !! read mhd 
   ! !! These are the 'optional'/model parameters
   ! read(10, nml=ScalarParam)
   if(ilesmod==0) then
@@ -577,6 +580,7 @@ subroutine parameter_defaults()
   use forces, only : iforces, nvol
 
   use partack,only : lpartack,ipartiout
+  use mhd, only: mhd_active
 
   implicit none
 
@@ -604,6 +608,8 @@ subroutine parameter_defaults()
 
   lpartack=.false.
   ipartiout=1
+
+  mhd_active=.false.
 
   !! LES stuff
   SmagWallDamp=0
