@@ -20,7 +20,7 @@ module tools
        apply_spatial_filter, read_inflow, append_outflow, write_outflow, init_inflow_outflow, &
        compute_cfldiff, compute_cfl, &
        rescale_pressure, mean_plane_x, mean_plane_y, mean_plane_z, &
-       avg3d
+       avg3d, residual
 
 contains
   !##################################################################
@@ -1027,6 +1027,108 @@ contains
     return
 
   end subroutine avg3d
+  
+  !+-------------------------------------------------------------------+
+  !| this subroutine is used to calculated the residual of velocity    |
+  !+-------------------------------------------------------------------+
+  !| change record                                                     |
+  !| -------------                                                     |
+  !| 15-Nov-2022  | Created by J. Fang STFC Daresbury Laboratory       |
+  !+-------------------------------------------------------------------+
+  subroutine residual(ux,itime,record)
+    !
+    use decomp_2d, only : mytype,real_type,nrank
+    use variables, only : ilist
+    use param, only : ifirst,ilast
+    use mpi
+    !
+    real(mytype),intent(in) :: ux(:,:,:)
+    integer, intent(in) :: itime
+    logical,intent(in),optional :: record
+    !
+    real(mytype),allocatable,save :: uxsave(:,:,:)
+    !
+    real(mytype) :: resid_ux,resid_uxout
+    integer :: i,j,k,code,ns,ferr
+    logical :: lrec,lexist
+    logical,save :: firstcall=.true.
+    integer,save :: fhand
+    !
+    if(present(record)) then
+      lrec=record
+    else
+      lrec=.false.
+    endif
+    !
+    if(firstcall) then
+      !
+      if (nrank == 0) then
+        !
+        if(lrec) then
+          !
+          inquire(file="residual.dat",exist=lexist)
+          open(newunit=fhand,file="residual.dat",action='write')
+          !
+          if(itime==1 .or. (.not. lexist)) then
+            continue
+          else
+            ns=0
+            do while(ns<itime)
+              read(fhand,*,iostat=ferr)ns
+              !
+              if(ferr<0) then
+                print*,' ** itime=',ns,itime
+                print*,' ** end of flowstate.dat is reached.'
+                !
+                exit
+                !
+              endif
+              !
+            enddo
+            !
+          endif
+          !
+        endif
+        !
+      endif
+      !
+      firstcall=.false.
+      !
+    endif
+    !
+    if(.not. allocated(uxsave)) allocate(uxsave(size(ux,1),size(ux,2),size(ux,3)))
+    !
+    uxsave=abs(uxsave-ux)
+    !
+    resid_ux=maxval(uxsave)
+    !
+    call mpi_reduce(resid_ux,resid_uxout,1,real_type,mpi_max,0,mpi_comm_world,code)
+    !
+    if (nrank == 0) then
+      !
+      if ((mod(itime,ilist)==0 .or. itime == ifirst .or. itime == ilast)) then
+        write(*,*) 'U residual=',resid_uxout
+      endif
+      !
+      if(lrec) then
+        write(fhand,*)itime,resid_uxout
+        !
+        if(itime == ilast) then
+          close(fhand)
+        endif
+        !
+      endif
+      !
+      !
+    endif
+    !
+    uxsave=ux
+    !
+  end subroutine residual
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine residual.                               |
+  !+-------------------------------------------------------------------+
+
 end module tools
 !##################################################################
 

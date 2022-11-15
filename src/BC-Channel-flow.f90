@@ -116,7 +116,7 @@ contains
                 if (idir_stream == 1) then
                    ux1(i,j,k)=one-y*y
                    uy1(i,j,k)=zero
-                   uz1(i,j,k)=sin(real(i-1,mytype)*dx)+cos(real(k-1,mytype)*dz)
+                   uz1(i,j,k)=zero !sin(real(i-1,mytype)*dx)+cos(real(k-1,mytype)*dz)
                 else
                    uz1(i,j,k)=one-y*y
                    uy1(i,j,k)=zero

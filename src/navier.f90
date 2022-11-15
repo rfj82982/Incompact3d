@@ -12,6 +12,7 @@ module navier
   public :: pre_correc, cor_vel
   public :: lmn_t_to_rho_trans, momentum_to_velocity, velocity_to_momentum
   public :: gradp, tbl_flrt
+  public :: extrapol_drhodt
 
 contains
   !############################################################################
@@ -243,6 +244,7 @@ contains
 
     return
   end subroutine cor_vel
+  !
   !############################################################################
   !subroutine DIVERGENCe
   !Calculation of div u* for nlock=1 and of div u^{n+1} for nlock=2

@@ -482,7 +482,7 @@ contains
     endif
 
     if(mhd_active) then
-      call momentum_forcing_mhd(dux1(:,:,:,1), duy1(:,:,:,1), duz1(:,:,:,1), ux1, uy1, uz1)
+      call momentum_forcing_mhd(dux1(:,:,:,1),duy1(:,:,:,1),duz1(:,:,:,1),ux1,uy1,uz1)
     endif
 
   end subroutine momentum_forcing
@@ -552,6 +552,7 @@ contains
        call test_speed_min_max(ux1,uy1,uz1)
        call compute_cfl(ux1,uy1,uz1)
        if (iscalar==1) call test_scalar_min_max(phi1)
+       !
     endif
 
   end subroutine test_flow

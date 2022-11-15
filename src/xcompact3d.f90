@@ -44,7 +44,7 @@ program xcompact3d
   use time_integrators, only : int_time
   use navier, only : velocity_to_momentum, momentum_to_velocity, pre_correc, &
        calc_divu_constraint, solve_poisson, cor_vel
-  use tools, only : restart, simu_stats, apply_spatial_filter, read_inflow
+  use tools, only : restart, simu_stats, apply_spatial_filter,read_inflow,residual
   use turbine, only : compute_turbines
   use ibm_param
   use ibm, only : body
@@ -60,6 +60,8 @@ program xcompact3d
 
   call init_xcompact3d()
 
+  call postprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
+  
   do itime=ifirst,ilast
      !t=itime*dt
      t=t0 + (itime0 + itime + 1 - ifirst)*dt
@@ -118,6 +120,9 @@ program xcompact3d
         call test_flow(rho1,ux1,uy1,uz1,phi1,ep1,drho1,divu3)
 
      enddo !! End sub timesteps
+     !
+     ! this only makes sense to steady flow simulation
+     ! call residual(ux1,itime,record=.true.)
      !
      if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
        !

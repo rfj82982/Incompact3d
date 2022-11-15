@@ -17,10 +17,12 @@ module partack
   interface psum
     module procedure psum_mytype_ary
     module procedure psum_integer
+    module procedure psum_mytype
   end interface
   !
   interface pmax
     module procedure pmax_int
+    module procedure pmax_mytype
   end interface
   !
   interface mclean
@@ -1663,6 +1665,33 @@ module partack
     !
   end function psum_integer
   !
+  function psum_mytype(var,comm) result(varsum)
+    !
+    use mpi
+    use decomp_2d, only : real_type
+    !
+    ! arguments
+    real(mytype),intent(in) :: var
+    integer,optional,intent(in) :: comm
+    real(mytype) :: varsum
+    !
+    ! local data
+    integer :: ierr,comm2use
+    !
+    if(present(comm)) then
+        comm2use=comm
+    else
+        comm2use=mpi_comm_world
+    endif
+    !
+    !
+    call mpi_allreduce(var,varsum,1,real_type,mpi_sum,           &
+                                                    comm2use,ierr)
+    !
+    return
+    !
+  end function psum_mytype
+  !
   !+-------------------------------------------------------------------+
   !| this subroutine clean superfluous elements in a array             |
   !+-------------------------------------------------------------------+
@@ -2377,6 +2406,22 @@ module partack
                                                     mpi_comm_world,ierr)
     !
   end function pmax_int
+  !
+  real(mytype) function  pmax_mytype(var)
+    !
+    use mpi
+    use decomp_2d, only : real_type
+    !
+    ! arguments
+    real(mytype),intent(in) :: var
+    !
+    ! local data
+    integer :: ierr
+    !
+    call mpi_allreduce(var,pmax_mytype,1,real_type,mpi_max,             &
+                                                    mpi_comm_world,ierr)
+    !
+  end function pmax_mytype
   !
   subroutine pswap_yz(varin,varout)
     !
