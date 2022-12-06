@@ -305,10 +305,10 @@ contains
        ENDIF
     ENDIF
     
-    !! partical tracking
-    if(lpartack) then
-      call intt_particel()
-    endif
+    ! !! partical tracking
+    ! if(lpartack) then
+    !   call intt_particel()
+    ! endif
 
 #ifdef DEBG
     if (nrank .eq. 0) write(*,*)'## End  int_time'

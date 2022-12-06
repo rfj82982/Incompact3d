@@ -50,7 +50,7 @@ program xcompact3d
   use ibm, only : body
   use genepsi, only : genepsi3d
   use partack,only : lpartack,particle_velo,write_particle,h5write_particle, &
-                     ipartiout,numparticle, partile_inject,numpartix
+                     ipartiout,numparticle, partile_inject,numpartix,intt_particel
 #ifdef DEBG 
   use tools, only : avg3d
 #endif
@@ -61,6 +61,8 @@ program xcompact3d
   call init_xcompact3d()
 
   call postprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
+
+  call intt_particel(ux1,uy1,uz1,t)
   
   do itime=ifirst,ilast
      !t=itime*dt
@@ -92,9 +94,6 @@ program xcompact3d
         endif
         call calculate_transeq_rhs(drho1,dux1,duy1,duz1,dphi1,rho1,ux1,uy1,uz1,ep1,phi1,divu3)
 
-        
-        if(lpartack) call particle_velo(ux1,uy1,uz1)
-
 #ifdef DEBG
         call check_transients()
 #endif
@@ -118,6 +117,8 @@ program xcompact3d
         endif
         
         call test_flow(rho1,ux1,uy1,uz1,phi1,ep1,drho1,divu3)
+
+        if(lpartack) call intt_particel(ux1,uy1,uz1,t)
 
      enddo !! End sub timesteps
      !

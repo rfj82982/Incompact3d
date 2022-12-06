@@ -404,6 +404,7 @@ contains
     use var, only : ta2,tb2,tc2,td2,te2,tf2,di2,ta3,tb3,tc3,td3,te3,tf3,di3
     use var, ONLY : nzmsize
     use visu, only : write_field
+    use mhd, only : mhd_active,elefld
     
     use ibm_param, only : ubcx,ubcy,ubcz
 
@@ -461,6 +462,12 @@ contains
                  - tg1(:,:,:) * tc1(:,:,:) &
                  - th1(:,:,:) * tf1(:,:,:)
     call write_field(di1, ".", "critq", trim(num), flush = .true.) ! Reusing temporary array, force flush
+    
+    if(mhd_active) then
+      call write_field(elefld(:,:,:,1), ".", "J_x", trim(num), flush = .true.)
+      call write_field(elefld(:,:,:,2), ".", "J_y", trim(num), flush = .true.)
+      call write_field(elefld(:,:,:,3), ".", "J_z", trim(num), flush = .true.)
+    endif
 
   end subroutine visu_channel
   !############################################################################

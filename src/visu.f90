@@ -235,7 +235,8 @@ contains
     call write_field(ux1, ".", "ux", trim(num))
     call write_field(uy1, ".", "uy", trim(num))
     call write_field(uz1, ".", "uz", trim(num))
-
+    
+    
     ! Interpolate pressure
     !WORK Z-PENCILS
     call interzpv(ppi3,pp3(:,:,:,1),dip3,sz,cifip6z,cisip6z,ciwip6z,cifz6,cisz6,ciwz6,&
