@@ -31,10 +31,6 @@ contains
     use param
     use MPI
     use dbg_schemes, only: exp_prec, abs_prec, sqrt_prec
-#ifdef DEBG 
-    use tools, only : avg3d
-#endif
-    
 
     implicit none
 
@@ -59,10 +55,6 @@ contains
     real(mytype), dimension(3) :: dim_min, dim_max
     real( kind = 8 ) :: r8_random
     external r8_random, return_30k
-#ifdef DEBG 
-    real(mytype) avg_param
-#endif
-
 
     if (idir_stream /= 1 .and. idir_stream /= 3) then
        if (nrank == 0) then
@@ -252,19 +244,6 @@ contains
        enddo
     enddo
 
-#ifdef DEBG
-    avg_param = zero
-    call avg3d (ux1, avg_param)
-    if (nrank == 0) write(*,*)'## SUB Channel Init ux_avg ', avg_param
-    avg_param = zero
-    call avg3d (uy1, avg_param)
-    if (nrank == 0) write(*,*)'## SUB Channel Init uy_avg ', avg_param
-    avg_param = zero
-    call avg3d (uz1, avg_param)
-    if (nrank == 0) write(*,*)'## SUB Channel Init uz_avg ', avg_param
-    if (nrank .eq. 0) write(*,*) '# init end ok'
-#endif
-
     return
   end subroutine init_channel
   !############################################################################
@@ -414,7 +393,7 @@ contains
     real(mytype), intent(in), dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize,npress) :: pp3
     real(mytype), intent(in), dimension(xsize(1),xsize(2),xsize(3),numscalar) :: phi1
     real(mytype), intent(in), dimension(xsize(1),xsize(2),xsize(3)) :: ep1
-    character(len=32), intent(in) :: num
+    integer, intent(in) :: num
 
     ! Write vorticity as an example of post processing
 
@@ -461,12 +440,13 @@ contains
                  - td1(:,:,:) * tb1(:,:,:) &
                  - tg1(:,:,:) * tc1(:,:,:) &
                  - th1(:,:,:) * tf1(:,:,:)
-    call write_field(di1, ".", "critq", trim(num), flush = .true.) ! Reusing temporary array, force flush
+
+    call write_field(di1, ".", "critq", num, flush = .true.) ! Reusing temporary array, force flush
     
     if(mhd_active) then
-      call write_field(elefld(:,:,:,1), ".", "J_x", trim(num), flush = .true.)
-      call write_field(elefld(:,:,:,2), ".", "J_y", trim(num), flush = .true.)
-      call write_field(elefld(:,:,:,3), ".", "J_z", trim(num), flush = .true.)
+      call write_field(elefld(:,:,:,1), ".", "J_x", num, flush = .true.)
+      call write_field(elefld(:,:,:,2), ".", "J_y", num, flush = .true.)
+      call write_field(elefld(:,:,:,3), ".", "J_z", num, flush = .true.)
     endif
 
   end subroutine visu_channel

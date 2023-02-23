@@ -73,7 +73,7 @@ subroutine parameter(input_i3d)
   NAMELIST /ABL/ z_zero, iwallmodel, k_roughness, ustar, dBL, &
        imassconserve, ibuoyancy, iPressureGradient, iCoriolis, CoriolisFreq, &
        istrat, idamping, iheight, TempRate, TempFlux, itherm, gravv, UG, T_wall, T_top, ishiftedper, iconcprec, pdl 
-  NAMELIST /CASE/ tgv_twod, pfront
+  NAMELIST /CASE/ pfront
   NAMELIST/ALMParam/iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange
@@ -105,6 +105,13 @@ subroutine parameter(input_i3d)
 
   !! These are the 'essential' parameters
   read(10, nml=BasicParam); rewind(10)
+  if (nz==1) then
+     if (nrank==0) write(*,*) "Warning : support for 2D simulations is experimental"
+     nclz1 = 0
+     nclzn = 0
+     p_row = nproc
+     p_col = 1
+  endif
   read(10, nml=NumOptions); rewind(10)
   read(10, nml=InOutParam); rewind(10)
   read(10, nml=Statistics); rewind(10)
@@ -191,6 +198,10 @@ subroutine parameter(input_i3d)
   endif
   if (numscalar.ne.0) then
      read(10, nml=ScalarParam); rewind(10)
+     if (nz==1) then
+        nclzS1 = 0
+        nclzSn = 0
+     endif
   endif
 
   read(10, nml=PartiParam); rewind(10) !! read particle 
@@ -339,7 +350,8 @@ subroutine parameter(input_i3d)
      elseif (itype.eq.itype_mixlayer) then
         print *,'Mixing layer'
      elseif (itype.eq.itype_jet) then
-        print *,'Jet'
+        print *,'Jet is currently unsupported!'
+        stop
      elseif (itype.eq.itype_tbl) then
         print *,'Turbulent boundary layer'
      elseif (itype.eq.itype_abl) then
@@ -347,7 +359,9 @@ subroutine parameter(input_i3d)
      elseif (itype.eq.itype_uniform) then
         print *,'Uniform flow'
      elseif (itype.eq.itype_sandbox) then
-           print *,'Sandbox'
+        print *,'Sandbox'
+     elseif (itype.eq.itype_cavity) then
+        print *,'Cavity'  
      else
         print *,'Unknown itype: ', itype
         stop
@@ -544,8 +558,6 @@ subroutine parameter(input_i3d)
      !! Print case-specific information
      if (itype==itype_lockexch) then
         write(*,*)  "Initial front location: ", pfront
-     elseif (itype==itype_tgv) then
-        write(*,*)  "TGV 2D: ", tgv_twod
      endif
      write(*,*) '==========================================================='
   endif
@@ -701,9 +713,6 @@ subroutine parameter_defaults()
   izap = 1
 
   imodulo2 = 1
-
-  !! CASE specific variables
-  tgv_twod = .FALSE.
 
   !! TRIPPING
   A_tr=zero

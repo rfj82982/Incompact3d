@@ -66,18 +66,10 @@ contains
              do i=1,xsize(1)
                 x=real(i-1,mytype)*dx
 
-                if (.not.tgv_twod) then
-                   ux1(i,j,k)=+sin_prec(x)*cos_prec(y)*cos_prec(z)
-                   uy1(i,j,k)=-cos_prec(x)*sin_prec(y)*cos_prec(z)
-                   if (iscalar == 1) then
-                      phi1(i,j,k,1:numscalar)=sin_prec(x)*sin_prec(y)*cos_prec(z)
-                   endif
-                else
-                   ux1(i,j,k)=+sin_prec(x)*cos_prec(y)
-                   uy1(i,j,k)=-cos_prec(x)*sin_prec(y)
-                   if (iscalar == 1) then
-                      phi1(i,j,k,1:numscalar)=sin_prec(x)*sin_prec(y)
-                   endif
+                ux1(i,j,k)=+sin_prec(x)*cos_prec(y)*cos_prec(z)
+                uy1(i,j,k)=-cos_prec(x)*sin_prec(y)*cos_prec(z)
+                if (iscalar == 1) then
+                   phi1(i,j,k,1:numscalar)=sin_prec(x)*sin_prec(y)*cos_prec(z)
                 endif
                 uz1(i,j,k)=zero
              enddo
@@ -457,7 +449,7 @@ contains
     real(mytype), intent(in), dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize,npress) :: pp3
     real(mytype), intent(in), dimension(xsize(1),xsize(2),xsize(3),numscalar) :: phi1
     real(mytype), intent(in), dimension(xsize(1),xsize(2),xsize(3)) :: ep1
-    character(len=32), intent(in) :: num
+    integer, intent(in) :: num
 
     ! Write vorticity as an example of post processing
 
@@ -502,7 +494,7 @@ contains
     di1(:,:,:)=sqrt(  (tf1(:,:,:)-th1(:,:,:))**2 &
                     + (tg1(:,:,:)-tc1(:,:,:))**2 &
                     + (tb1(:,:,:)-td1(:,:,:))**2)
-    call write_field(di1, ".", "vort", trim(num), flush=.true.) ! Reusing temporary array, force flush
+    call write_field(di1, ".", "vort", num, flush=.true.) ! Reusing temporary array, force flush
 
     !Q=-0.5*(ta1**2+te1**2+ti1**2)-td1*tb1-tg1*tc1-th1*tf1
     di1 = zero
@@ -510,7 +502,7 @@ contains
                   - td1(:,:,:)*tb1(:,:,:) &
                   - tg1(:,:,:)*tc1(:,:,:) &
                   - th1(:,:,:)*tf1(:,:,:)
-    call write_field(di1, ".", "critq", trim(num), flush=.true.) ! Reusing temporary array, force flush
+    call write_field(di1, ".", "critq", num, flush=.true.) ! Reusing temporary array, force flush
 
   end subroutine visu_tgv
   !############################################################################

@@ -44,16 +44,13 @@ program xcompact3d
   use time_integrators, only : int_time
   use navier, only : velocity_to_momentum, momentum_to_velocity, pre_correc, &
        calc_divu_constraint, solve_poisson, cor_vel
-  use tools, only : restart, simu_stats, apply_spatial_filter,read_inflow,residual
+  use tools, only : restart, simu_stats, apply_spatial_filter,read_inflow
   use turbine, only : compute_turbines
   use ibm_param
   use ibm, only : body
   use genepsi, only : genepsi3d
   use partack,only : lpartack,particle_velo,write_particle,h5write_particle, &
                      ipartiout,numparticle, partile_inject,numpartix,intt_particel
-#ifdef DEBG 
-  use tools, only : avg3d
-#endif
 
   implicit none
 
@@ -381,22 +378,24 @@ end subroutine finalise_xcompact3d
 subroutine check_transients()
 
   use decomp_2d, only : mytype
-
+  use mpi
   use var
-  use tools, only : avg3d
   
   implicit none
 
-  real(mytype) avg_param
-  
-  avg_param = zero
-  call avg3d (dux1, avg_param)
-  if (nrank == 0) write(*,*)'## Main dux1 ', avg_param
-  avg_param = zero
-  call avg3d (duy1, avg_param)
-  if (nrank == 0) write(*,*)'## Main duy1 ', avg_param
-  avg_param = zero
-  call avg3d (duz1, avg_param)
-  if (nrank == 0) write(*,*)'## Main duz1 ', avg_param
+  real(mytype) :: dep, dep1
+  integer :: code
+   
+  dep=maxval(abs(dux1))
+  call MPI_ALLREDUCE(dep,dep1,1,real_type,MPI_MAX,MPI_COMM_WORLD,code)
+  if (nrank == 0) write(*,*)'## MAX dux1 ', dep1
+ 
+  dep=maxval(abs(duy1))
+  call MPI_ALLREDUCE(dep,dep1,1,real_type,MPI_MAX,MPI_COMM_WORLD,code)
+  if (nrank == 0) write(*,*)'## MAX duy1 ', dep1
+ 
+  dep=maxval(abs(duz1))
+  call MPI_ALLREDUCE(dep,dep1,1,real_type,MPI_MAX,MPI_COMM_WORLD,code)
+  if (nrank == 0) write(*,*)'## MAX duz1 ', dep1
   
 end subroutine check_transients
