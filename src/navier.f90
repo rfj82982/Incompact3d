@@ -612,9 +612,9 @@ contains
           enddo
           do k=1,xsize(3)
              do i=1,xsize(1)
-                ux(i,1,k)=byx1(i,k)+dpdxy1(i,k)
+                ux(i,1,k)=byx1(i,k) !+dpdxy1(i,k) ! no-slip b.c.
                 uy(i,1,k)=byy1(i,k)
-                uz(i,1,k)=byz1(i,k)+dpdzy1(i,k)
+                uz(i,1,k)=byz1(i,k) !+dpdzy1(i,k) ! no-slip b.c.
              enddo
           enddo
        endif
@@ -632,17 +632,17 @@ contains
        if (dims(1)==1) then
           do k=1,xsize(3)
              do i=1,xsize(1)
-                ux(i,xsize(2),k)=byxn(i,k)+dpdxyn(i,k)
+                ux(i,xsize(2),k)=byxn(i,k) !+dpdxyn(i,k)  ! no-slip b.c.
                 uy(i,xsize(2),k)=byyn(i,k)
-                uz(i,xsize(2),k)=byzn(i,k)+dpdzyn(i,k)
+                uz(i,xsize(2),k)=byzn(i,k) !+dpdzyn(i,k)  ! no-slip b.c.
              enddo
           enddo
        elseif (ny - (nym / dims(1)) == xstart(2)) then
           do k=1,xsize(3)
              do i=1,xsize(1)
-                ux(i,xsize(2),k)=byxn(i,k)+dpdxyn(i,k)
+                ux(i,xsize(2),k)=byxn(i,k) !+dpdxyn(i,k)  ! no-slip b.c.
                 uy(i,xsize(2),k)=byyn(i,k)
-                uz(i,xsize(2),k)=byzn(i,k)+dpdzyn(i,k)
+                uz(i,xsize(2),k)=byzn(i,k) !+dpdzyn(i,k)  ! no-slip b.c.
              enddo
           enddo
        endif
@@ -737,6 +737,8 @@ contains
     call avg3d (uz, avg_param)
     if (nrank == 0) write(*,*)'## Pres corr uz ', avg_param
 #endif
+
+    ! call boundary_velocity_check(ux,uy,uz,note='after pre_correc')
 
     if (iibm==1) then !solid body old school
        call corgp_IBM(ux1,uy1,uz1,px1,py1,pz1,1)

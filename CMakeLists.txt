@@ -139,7 +139,7 @@ endif()
 
 # SET HDF5
 set(HDF5_PREFER_PARALLEL TRUE)
-set(HDF5_DIR "/home/fangjian/opt/hdf5")
+set(HDF5_DIR "/home/fangjian/opt/hdf5-1.12.2")
 find_package(HDF5 REQUIRED COMPONENTS Fortran HL)
 
 message(STATUS "HDF5_Fortran_COMPILER found: ${HDF5_Fortran_COMPILER_EXECUTABLE}")

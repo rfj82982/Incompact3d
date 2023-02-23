@@ -60,7 +60,7 @@ program xcompact3d
 
   call init_xcompact3d()
 
-  call postprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
+  ! call postprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
 
   call intt_particel(ux1,uy1,uz1,t)
   

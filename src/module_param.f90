@@ -28,6 +28,8 @@ module variables
   integer :: nx,ny,nz,numscalar,p_row,p_col,nxm,nym,nzm,spinup_time
   integer :: nstat=1,nvisu=1,nprobe=1,nlength=1,ilist=25
 
+  integer :: nsamples
+
   real(mytype),allocatable,dimension(:) :: sc,uset,cp,ri,group
   real(mytype) :: nu0nu, cnu
 

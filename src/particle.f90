@@ -396,7 +396,7 @@ module partack
     h5io_time=0.d0
     !
     particletime=t
-    sub_time_step=0.05d0*dt
+    sub_time_step=0.01d0*dt
     !
   end subroutine init_particle
   !+-------------------------------------------------------------------+

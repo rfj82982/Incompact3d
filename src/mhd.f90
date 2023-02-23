@@ -88,10 +88,14 @@ module mhd
   !+-------------------------------------------------------------------+
   subroutine momentum_forcing_mhd(dux1,duy1,duz1,ux1,uy1,uz1)
     !
+    USE decomp_2d
+    use mpi
     use param,     only : dx,dz
+    use variables, only : ppy
     use variables, only : yp,ny,nz
     use decomp_2d, only : xstart
     use constants, only : pi
+    use param, only : zero,two,three,dy,yly
     !
     ! arguments
     real(mytype),intent(in),dimension(xsize(1),xsize(2),xsize(3)) ::   &
@@ -99,9 +103,10 @@ module mhd
     real(mytype),intent(inout),                                        &
                 dimension(xsize(1),xsize(2),xsize(3)) ::  dux1,duy1,duz1
     !
-    real(mytype) :: eforce(3)
+    real(mytype) :: eforce(3),Ebar(3)
+    real(mytype) :: ub,uball,coeff
     ! local data
-    integer :: i,j,k
+    integer :: i,j,k,jloc,code
     real(mytype) :: elecur(3),var1(3),var2(3)
     !
     real(mytype) :: xx(xsize(1)),yy(xsize(2)),zz(xsize(3))
@@ -154,11 +159,34 @@ module mhd
     ! write(rankname,'(i4.4)')nrank
     ! open(18,file='mhd_force'//rankname//'.dat')
     !
+    ub = zero
+    uball = zero
+    coeff = dy / (yly * real(xsize(1) * zsize(3), kind=mytype))
+
+    do k = 1, xsize(3)
+       do jloc = 1, xsize(2)
+          j = jloc + xstart(2) - 1
+          do i = 1, xsize(1)
+            ub = ub + ux1(i,jloc,k) / ppy(j)
+          enddo
+       enddo
+    enddo
+
+    ub = ub * coeff
+
+    call MPI_ALLREDUCE(ub,uball,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+
     do k = 1, xsize(3)
     do j = 1, xsize(2)
     do i = 1, xsize(1)
       !
-      eforce=cross_product(elefld(i,j,k,:),magent(i,j,k,:))*stuart
+      Ebar(1)=0.d0
+      Ebar(2)=0.d0
+      Ebar(3)=-magent(i,j,k,2)*uball
+      !
+      elecur(:)=elefld(i,j,k,:)+Ebar
+      !
+      eforce=cross_product(elecur(:),magent(i,j,k,:))*stuart
       !
       dux1(i,j,k) = dux1(i,j,k)+eforce(1)
       duy1(i,j,k) = duy1(i,j,k)+eforce(2)
@@ -403,6 +431,81 @@ module mhd
   end subroutine  divergence_vmesh_check
   !+-------------------------------------------------------------------+
   !| The end of the subroutine divergence_vmesh_check.                 |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| this subroutine is used to check the velocity at wall             |
+  !+-------------------------------------------------------------------+
+  !| change record                                                     |
+  !| -------------                                                     |
+  !| 27-Jan-2023  | Created by J. Fang STFC Daresbury Laboratory       |
+  !+-------------------------------------------------------------------+
+  subroutine boundary_velocity_check(ux,uy,uz,note)
+    !
+    USE decomp_2d
+    use var,     only : nx,ny,nz
+    use partack, only: psum
+    !
+    real(mytype),intent(in),dimension(xsize(1),xsize(2),xsize(3)) ::   &
+                                                             ux,uy,uz
+    character(len=*),intent(in),optional :: note
+    !
+    real(8) :: ux_m,uy_m,uz_m,ux_f,uy_f,uz_f
+    integer :: i,j,k
+    !
+    ux_m=0.d0; uy_m=0.d0; uz_m=0.d0
+    ux_f=0.d0; uy_f=0.d0; uz_f=0.d0
+    !
+    if (xstart(2)==1) then
+      do k=1,xsize(3)
+      do i=1,xsize(1)
+        ux_m=ux_m+ux(i,1,k)
+        ux_f=ux_f+ux(i,1,k)**2
+        !
+        uy_m=uy_m+uy(i,1,k)
+        uy_f=uy_f+uy(i,1,k)**2
+        !
+        uz_m=uz_m+uz(i,1,k)
+        uz_f=uz_f+uz(i,1,k)**2
+      enddo
+      enddo
+    endif
+    !
+    if (xend(2)==ny) then
+      do k=1,xsize(3)
+      do i=1,xsize(1)
+        ux_m=ux_m+ux(i,xsize(2),k)
+        ux_f=ux_f+ux(i,xsize(2),k)**2
+        !
+        uy_m=uy_m+uy(i,xsize(2),k)
+        uy_f=uy_f+uy(i,xsize(2),k)**2
+        !
+        uz_m=uz_m+uz(i,xsize(2),k)
+        uz_f=uz_f+uz(i,xsize(2),k)**2
+      enddo
+      enddo
+    endif
+    !
+    ux_m=psum(ux_m)/(nx*nz)
+    ux_f=psum(ux_f)/(nx*nz)
+    uy_m=psum(uy_m)/(nx*nz)
+    uy_f=psum(uy_f)/(nx*nz)
+    uz_m=psum(uz_m)/(nx*nz)
+    uz_f=psum(uz_f)/(nx*nz)
+    !
+    if (nrank == 0) then
+      !
+      if(present(note)) then
+        write(*,*)' ** note ',note
+      endif
+      !
+      write(*,*)' ** u_m ', ux_m,uy_m,uz_m
+      write(*,*)' ** u_f ', ux_f,uy_f,uz_f
+    endif
+    !
+  end subroutine boundary_velocity_check
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine boundary_velocity_check.                |
   !+-------------------------------------------------------------------+
   !
   !!############################################################################
