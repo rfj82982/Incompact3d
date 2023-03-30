@@ -383,7 +383,7 @@ contains
     use var, only : ta2,tb2,tc2,td2,te2,tf2,di2,ta3,tb3,tc3,td3,te3,tf3,di3
     use var, ONLY : nzmsize
     use visu, only : write_field
-    use mhd, only : mhd_active,elefld
+    use mhd, only : mhd_active,Je
     
     use ibm_param, only : ubcx,ubcy,ubcz
 
@@ -444,9 +444,9 @@ contains
     call write_field(di1, ".", "critq", num, flush = .true.) ! Reusing temporary array, force flush
     
     if(mhd_active) then
-      call write_field(elefld(:,:,:,1), ".", "J_x", num, flush = .true.)
-      call write_field(elefld(:,:,:,2), ".", "J_y", num, flush = .true.)
-      call write_field(elefld(:,:,:,3), ".", "J_z", num, flush = .true.)
+      call write_field(Je(:,:,:,1), ".", "J_x", num, flush = .true.)
+      call write_field(Je(:,:,:,2), ".", "J_y", num, flush = .true.)
+      call write_field(Je(:,:,:,3), ".", "J_z", num, flush = .true.)
     endif
 
   end subroutine visu_channel

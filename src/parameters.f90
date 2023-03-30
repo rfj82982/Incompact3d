@@ -34,7 +34,7 @@ subroutine parameter(input_i3d)
   use forces, only : iforces, nvol, xld, xrd, yld, yud!, zld, zrd
 
   use partack, only: numparticle,lpartack,partirange,ipartiout,numpartix
-  use mhd, only: mhd_active,hartmann
+  use mhd, only: mhd_active,hartmann,stuart,rem
 
   implicit none
 
@@ -77,7 +77,7 @@ subroutine parameter(input_i3d)
   NAMELIST/ALMParam/iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange
-  NAMELIST/MHDParam/mhd_active,hartmann
+  NAMELIST/MHDParam/mhd_active,stuart,rem
 
 #ifdef DEBG
   if (nrank == 0) write(*,*) '# parameter start'

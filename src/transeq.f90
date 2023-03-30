@@ -19,6 +19,7 @@ contains
     use decomp_2d, only : mytype, xsize, zsize
     use variables, only : numscalar
     use param, only : ntime, ilmn, nrhotime, ilmn_solve_temp
+    use mhd,   only : mhd_active,calculate_mhd_transeq_rhs
 
     implicit none
 
@@ -40,6 +41,8 @@ contains
     !! Scalar equations
     !! XXX Not yet LMN!!!
     call scalar(dphi1, rho1, ux1, uy1, uz1, phi1)
+
+    if(mhd_active) call calculate_mhd_transeq_rhs(ux1,uy1,uz1)
 
     !! Other (LMN, ...)
     if (ilmn) THEN

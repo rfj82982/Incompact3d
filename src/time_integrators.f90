@@ -205,6 +205,7 @@ contains
     use variables, only : numscalar,nu0nu
     use var, only : ta1, tb1
     use partack, only : lpartack,intt_particel
+    use mhd,     only : mhd_active,int_time_magnet
     use MPI
 
     IMPLICIT NONE
@@ -307,6 +308,11 @@ contains
     !   call intt_particel()
     ! endif
 
+    if(mhd_active) then
+      call int_time_magnet
+    endif
+
+
 #ifdef DEBG
     if (nrank .eq. 0) write(*,*)'## End  int_time'
 #endif
@@ -349,7 +355,7 @@ contains
        call intt(uz1, duz1)
     endif
 
-  endsubroutine int_time_momentum
+  end subroutine int_time_momentum
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!

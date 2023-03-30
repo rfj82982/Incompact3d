@@ -589,7 +589,7 @@ contains
     call transpose_x_to_y(uzf1,uz2)
     !if (iscalar == 1) call transpose_x_to_y(phif1,phi2)
 
-    if (ifilter==1.or.ifilter==3) then ! all filter or y filter
+    if (ifilter==1.or.ifilter==2) then ! all filter or y filter
       call fily(uxf2,ux2,di2,fisy,fiffyp,fifsyp,fifwyp,ysize(1),ysize(2),ysize(3),1,ubcx)
       call fily(uyf2,uy2,di2,fisy,fiffy,fifsy,fifwy,ysize(1),ysize(2),ysize(3),0,ubcy)
       call fily(uzf2,uz2,di2,fisy,fiffyp,fifsyp,fifwyp,ysize(1),ysize(2),ysize(3),1,ubcz)
@@ -606,7 +606,7 @@ contains
     call transpose_y_to_z(uzf2,uz3)
     !if (iscalar == 1) call transpose_y_to_z(phif2,phi3)
 
-    if (ifilter==1.or.ifilter==2) then
+    if (ifilter==1.or.ifilter==3) then
       call filz(uxf3,ux3,di3,fisz,fiffzp,fifszp,fifwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
       call filz(uyf3,uy3,di3,fisz,fiffzp,fifszp,fifwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
       call filz(uzf3,uz3,di3,fisz,fiffz,fifsz,fifwz,zsize(1),zsize(2),zsize(3),0,ubcz)

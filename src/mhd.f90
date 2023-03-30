@@ -15,8 +15,8 @@ module mhd
   !
   implicit none
   !
-  logical :: mhd_active
-  real(8) :: hartmann,stuart 
+  logical :: mhd_active,sync_Bm_needed= .true.
+  real(8) :: hartmann,stuart,rem
   !+------------+------------------------------------------------------+
   !|  mhd_active| the swith to activate the mhd module.                |
   !|    hartmann| hartmann number, the ratio of lorentz force to       |
@@ -25,13 +25,14 @@ module mhd
   !|            | of electromagnetic to inertial forces                |
   !+------------+------------------------------------------------------+
   !
-  real(mytype),allocatable,dimension(:,:,:,:) :: magent,magelf,elefld
+  real(mytype),allocatable,dimension(:,:,:,:) :: Bm,magelf,Je
+  real(mytype),allocatable,dimension(:,:,:,:,:) :: dBm
   real(mytype),allocatable,dimension(:,:,:) :: elcpot
   !+------------+------------------------------------------------------+
-  !|      magent| magnetic field                                       |
+  !|          Bm| magnetic field                                       |
   !|      magelf| Electromagnetic forced to apply to the momentum eq.  |
   !|      elcpot| electric potential                                   |
-  !|      elefld| electric field as the gradient of potential          |
+  !|          Je| electric field as the gradient of potential          |
   !+------------+------------------------------------------------------+
   !
   contains
@@ -45,38 +46,65 @@ module mhd
   !+-------------------------------------------------------------------+
   subroutine mhd_init
     !
-    use param, only: re
+    use param, only: re,ntime
     !
-    stuart=hartmann**2/re
+    ! stuart=hartmann**2/re
+    !
+    hartmann=sqrt(stuart*re)
     !
     if(nrank==0) then
       !
       if(mhd_active) then
         print*,'** MHD Module activated'
         print*,'** Hartmann number: ',hartmann
-        print*,'** Reynolds number: ',re
         print*,'** Stuart number  : ',stuart
+        print*,'** Reynolds number: ',re
+        print*,'** magnetic Reynolds number: ',rem
       endif
       !
     endif
     !
-    allocate( magent(xsize(1),xsize(2),xsize(3),1:3),                  &
-              magelf(xsize(1),xsize(2),xsize(3),1:3),                  &
-              elefld(xsize(1),xsize(2),xsize(3),1:3),                  &
-              elcpot(xsize(1),xsize(2),xsize(3)) )
+    allocate( Bm(xsize(1),xsize(2),xsize(3),1:3),                  &
+              magelf(xsize(1),xsize(2),xsize(3),1:3),              &
+              Je(xsize(1),xsize(2),xsize(3),1:3),                  &
+              elcpot(xsize(1),xsize(2),xsize(3)),                  &
+              dBm(xsize(1),xsize(2),xsize(3),1:3,1:ntime) )
     !
     if(nrank==0) print*,'** MHD fields allocated'
     !
-    magent(:,:,:,1)=0.d0
-    magent(:,:,:,2)=1.d0
-    magent(:,:,:,3)=0.d0
-    !
-    if(nrank==0) print*,'** magnetic field initilised'
+    ! Bm(:,:,:,1)=0.d0
+    ! Bm(:,:,:,2)=1.d0
+    ! Bm(:,:,:,3)=0.d0
+    ! !
+    ! if(nrank==0) print*,'** magnetic field initilised'
     !
   end subroutine mhd_init
   !+-------------------------------------------------------------------+
   !| The end of the subroutine mhd_init.                               |
   !+-------------------------------------------------------------------+
+  !
+  subroutine int_time_magnet
+
+    USE param
+    USE variables
+    USE decomp_2d
+
+    implicit none
+    !
+    integer :: k
+
+    if(itimescheme.eq.5) then
+      !
+       if(itr.eq.1) then
+          Bm=gdt(itr)*dBm(:,:,:,:,1)+Bm
+       else
+          Bm=adt(itr)*dBm(:,:,:,:,1)+bdt(itr)*dBm(:,:,:,:,2)+Bm
+       endif
+       dBm(:,:,:,:,2)=dBm(:,:,:,:,1)
+       !
+    endif
+    !
+  end subroutine int_time_magnet
   !
   !+-------------------------------------------------------------------+
   !| this subroutine is used to add the electromagnetic force to the   |
@@ -112,7 +140,7 @@ module mhd
     real(mytype) :: xx(xsize(1)),yy(xsize(2)),zz(xsize(3))
     !
     !
-    call solve_mhd_poisson(ux1,uy1,uz1)
+    ! call solve_mhd_poisson(ux1,uy1,uz1)
     !
     ! do i=1,xsize(1)
     !   xx(i)=real(i-1,mytype)*dx
@@ -142,58 +170,63 @@ module mhd
     ! enddo
     ! enddo
     !
-    ! elefld=electric_field(elcpot)
+    ! Je=electric_field(elcpot)
     ! to obtain the electric field from electric potential
     !
     ! write(rankname,'(i4.4)')nrank
     ! open(18,file='testout/profile'//rankname//'.dat')
     ! ! do i = 1, xsize(1)
-    !   ! write(18,*)xx(i),elcpot(i,1,1),elefld(i,1,1,1)
+    !   ! write(18,*)xx(i),elcpot(i,1,1),Je(i,1,1,1)
     ! ! do k = 1, xsize(3)
-    ! !   write(18,*)zz(k),elcpot(1,1,k),elefld(1,1,k,3)
+    ! !   write(18,*)zz(k),elcpot(1,1,k),Je(1,1,k,3)
     ! do j = 1, xsize(2)
-    !   write(18,*)yy(j),elcpot(1,j,1),elefld(1,j,1,2)
+    !   write(18,*)yy(j),elcpot(1,j,1),Je(1,j,1,2)
     ! enddo
     ! close(18)
     ! !
     ! write(rankname,'(i4.4)')nrank
     ! open(18,file='mhd_force'//rankname//'.dat')
     !
-    ub = zero
-    uball = zero
-    coeff = dy / (yly * real(xsize(1) * zsize(3), kind=mytype))
+    ! ub = zero
+    ! uball = zero
+    ! coeff = dy / (yly * real(xsize(1) * zsize(3), kind=mytype))
 
-    do k = 1, xsize(3)
-       do jloc = 1, xsize(2)
-          j = jloc + xstart(2) - 1
-          do i = 1, xsize(1)
-            ub = ub + ux1(i,jloc,k) / ppy(j)
-          enddo
-       enddo
-    enddo
+    ! do k = 1, xsize(3)
+    !    do jloc = 1, xsize(2)
+    !       j = jloc + xstart(2) - 1
+    !       do i = 1, xsize(1)
+    !         ub = ub + ux1(i,jloc,k) / ppy(j)
+    !       enddo
+    !    enddo
+    ! enddo
 
-    ub = ub * coeff
+    ! ub = ub * coeff
 
-    call MPI_ALLREDUCE(ub,uball,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-
+    ! call MPI_ALLREDUCE(ub,uball,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+    
+    Je=del_cross_prod(Bm)/Rem
+    !
     do k = 1, xsize(3)
     do j = 1, xsize(2)
     do i = 1, xsize(1)
       !
-      Ebar(1)=0.d0
-      Ebar(2)=0.d0
-      Ebar(3)=-magent(i,j,k,2)*uball
+      ! Ebar(1)=0.d0
+      ! Ebar(2)=0.d0
+      ! Ebar(3)=-Bm(i,j,k,2)*uball
       !
-      elecur(:)=elefld(i,j,k,:)+Ebar
+      ! elecur(:)=Je(i,j,k,:)+Ebar
+      ! elecur(:)=Je(i,j,k,:)
       !
-      eforce=cross_product(elecur(:),magent(i,j,k,:))*stuart
+      ! Je(i,j,k,:)
+      !
+      eforce=cross_product(Je(i,j,k,:),Bm(i,j,k,:))*stuart
       !
       dux1(i,j,k) = dux1(i,j,k)+eforce(1)
       duy1(i,j,k) = duy1(i,j,k)+eforce(2)
       duz1(i,j,k) = duz1(i,j,k)+eforce(3)
-      !
+      
       ! if(i==1 .and. k==1) then
-      !   write(18,*)yy(j),magent(i,j,k,2),elefld(i,j,k,3),eforce(1)
+      !   write(18,*)yy(j),Bm(i,j,k,2),Je(i,j,k,3),eforce(1)
       ! endif
       !
     enddo
@@ -208,6 +241,42 @@ module mhd
   end subroutine momentum_forcing_mhd
   !+-------------------------------------------------------------------+
   !| The end of the subroutine momentum_forcing.                       |
+  !+-------------------------------------------------------------------+
+  !
+  !+-------------------------------------------------------------------+
+  !| this subroutine is used to calculate the result of ∇x.            |
+  !+-------------------------------------------------------------------+
+  !| change record                                                     |
+  !| -------------                                                     |
+  !| 28-Oct-2022  | Created by J. Fang STFC Daresbury Laboratory       |
+  !+-------------------------------------------------------------------+
+  function del_cross_prod(phi) result(delphi)
+    !
+    real(mytype) :: delphi(xsize(1),xsize(2),xsize(3),3)
+    real(mytype),intent(in) :: phi(xsize(1),xsize(2),xsize(3),3)
+    !
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3),3) :: dphi
+    !
+    dphi=grad_vmesh(phi(:,:,:,1))
+    !
+    delphi(:,:,:,2)= dphi(:,:,:,3)
+    delphi(:,:,:,3)=-dphi(:,:,:,2)
+    !
+    dphi=grad_vmesh(phi(:,:,:,2))
+    !
+    delphi(:,:,:,1)=-dphi(:,:,:,3)
+    delphi(:,:,:,3)= delphi(:,:,:,3) + dphi(:,:,:,1)
+    !
+    dphi=grad_vmesh(phi(:,:,:,3))
+    !
+    delphi(:,:,:,1)= delphi(:,:,:,1) + dphi(:,:,:,2)
+    delphi(:,:,:,2)= delphi(:,:,:,2) - dphi(:,:,:,1)
+    !
+    return
+    !
+  end function del_cross_prod
+  !+-------------------------------------------------------------------+
+  !| The end of the function del_cross_prod.                           |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -301,7 +370,7 @@ module mhd
       var1(2)=uy1(i,j,k)
       var1(3)=uz1(i,j,k)
       !
-      ucB(i,j,k,:) =cross_product(var1,magent(i,j,k,:))
+      ucB(i,j,k,:) =cross_product(var1,Bm(i,j,k,:))
       !
     enddo
     enddo
@@ -315,7 +384,7 @@ module mhd
       !
       call poisson(rhs)
       !
-      CALL gradp(elefld(:,:,:,1),elefld(:,:,:,2),elefld(:,:,:,3),rhs)
+      CALL gradp(Je(:,:,:,1),Je(:,:,:,2),Je(:,:,:,3),rhs)
       !
       converged=.true.
     enddo
@@ -324,13 +393,13 @@ module mhd
     do j = 1, xsize(2)
     do i = 1, xsize(1)
       !
-      elefld(i,j,k,:)=-elefld(i,j,k,:)+ucB(i,j,k,:)
+      Je(i,j,k,:)=-Je(i,j,k,:)+ucB(i,j,k,:)
       !
     enddo
     enddo
     enddo
     !
-    ! div3=divergence_sclar(elefld,nlock)
+    ! div3=divergence_sclar(Je,nlock)
     ! !
     ! call div_check(div3)
     !
@@ -353,12 +422,476 @@ module mhd
   !| The end of the subroutine solve_mhd_poisson.                      |
   !+-------------------------------------------------------------------+
   !
-  subroutine  div_check(divec)
+  subroutine calculate_mhd_transeq_rhs(ux1,uy1,uz1)
+    !
+    !! INPUTS
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1
+    !
+    call mhd_rhs_eq(dBm(:,:,:,:,1),Bm,ux1,uy1,uz1)
+    !
+  end subroutine calculate_mhd_transeq_rhs
+  !
+  subroutine test_magnetic
+    !
+    use decomp_2d, only : mytype, xsize, zsize, ph1, nrank
+    use var,       only : nzmsize,itime,ilist,ifirst,ilast,numscalar, dv3
+    use partack,   only : mpistop
+    use navier, only : divergence
+    use param, only : ntime,nrhotime
+    !
+    real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: div3
+
+
+    real(mytype), dimension(xsize(1), xsize(2), xsize(3)) :: ep1
+    real(mytype), dimension(xsize(1), xsize(2), xsize(3), nrhotime) :: rho1
+    real(mytype), dimension(xsize(1), xsize(2), xsize(3), numscalar)  :: phi1
+    real(mytype), dimension(xsize(1), xsize(2), xsize(3), ntime) :: drho1
+    real(mytype), dimension(zsize(1), zsize(2), zsize(3))  :: divu3
+
+    !
+    real(mytype) :: maxb,meanb
+    integer :: nlock
+    !
+    nlock=2
+    !
+    if ((mod(itime,ilist)==0 .or. itime == ifirst .or. itime == ilast)) then
+      !
+      ! div3=divergence_sclar(Bm,nlock)
+      call divergence(div3,rho1,Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),ep1,drho1,divu3,2,identifier='B')
+      !
+      ! call div_check(div3,maxb,meanb)
+      !
+      ! if (nrank == 0) then
+      !    write(*,*) 'DIV B max mean=',real(maxb,mytype),real(meanb/real(nproc),mytype)
+      ! endif
+      !
+    endif
+    !
+    ! call mpistop
+    !
+  end subroutine test_magnetic
+  !
+  subroutine mhd_rhs_eq(dB,B,ux1,uy1,uz1)
+
+    use param
+    use variables
+    use decomp_2d
+    use var, only : ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,mu1,mu2,mu3
+    use var, only : ux2,uy2,uz2,ta2,tb2,tc2,td2,te2,tf2,tg2,th2,ti2,tj2,di2
+    use var, only : ux3,uy3,uz3,ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3
+    use var, only : sgsx1,sgsy1,sgsz1
+    use var, only : FTx, FTy, FTz, Fdiscx, Fdiscy, Fdiscz
+    use ibm_param, only : ubcx,ubcy,ubcz
+    use les, only : compute_SGS
+    use mpi
+
+    implicit none
+
+    !! INPUTS
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1
+
+    !! OUTPUTS
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3),1:3) :: B,dB
+    
+    integer :: i,j,k,is
+    !
+
+    ! local 
+    real(mytype) :: rrem
+    real(mytype), save, allocatable, dimension(:,:,:) :: tx1,ty1,tz1,tx2,ty2,tz2, &
+                                                         tx3,ty3,tz3,bx2,by2,bz2, &
+                                                         bx3,by3,bz3
+    logical,save :: firstcal=.true.
+
+    if(firstcal) then
+      !
+      call alloc_x(tx1)
+      tx1 = zero
+      call alloc_x(ty1)
+      ty1 = zero
+      call alloc_x(tz1)
+      tz1 = zero
+  
+      call alloc_y(tx2)
+      tx2=zero
+      call alloc_y(ty2)
+      ty2=zero
+      call alloc_y(tz2)
+      tz2=zero
+  
+      call alloc_y(bx2)
+      bx2=zero
+      call alloc_y(by2)
+      by2=zero
+      call alloc_y(bz2)
+      bz2=zero
+
+      call alloc_z(tx3)
+      tx3=zero
+      call alloc_z(ty3)
+      ty3=zero
+      call alloc_z(tz3)
+      tz3=zero
+      !
+      call alloc_z(bx3)
+      bx3=zero
+      call alloc_z(by3)
+      by3=zero
+      call alloc_z(bz3)
+      bz3=zero
+      !
+      firstcal=.false.
+    endif
+
+    rrem=1.d0/Rem
+
+    !SKEW SYMMETRIC FORM
+
+    !WORK X-PENCILS
+    ta1(:,:,:) = ux1(:,:,:) * B(:,:,:,1) - B(:,:,:,1) * ux1(:,:,:) 
+    tb1(:,:,:) = ux1(:,:,:) * B(:,:,:,2) - B(:,:,:,1) * uy1(:,:,:)
+    tc1(:,:,:) = ux1(:,:,:) * B(:,:,:,3) - B(:,:,:,1) * uz1(:,:,:)
+    
+    call derx (td1,ta1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcx*ubcx)
+    call derx (te1,tb1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx*ubcy)
+    call derx (tf1,tc1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx*ubcz)
+
+    call derx (ta1,ux1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derx (tb1,uy1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derx (tc1,uz1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    !
+    call derx (tx1,B(:,:,:,1),di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derx (ty1,B(:,:,:,2),di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derx (tz1,B(:,:,:,3),di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+
+
+    ! Convective terms of x-pencil are stored in tg1,th1,ti1
+    
+    tg1(:,:,:) = td1(:,:,:)  + ux1(:,:,:) * tx1(:,:,:) - B(:,:,:,1) * ta1(:,:,:)
+    th1(:,:,:) = te1(:,:,:)  + ux1(:,:,:) * ty1(:,:,:) - B(:,:,:,1) * tb1(:,:,:)
+    ti1(:,:,:) = tf1(:,:,:)  + ux1(:,:,:) * tz1(:,:,:) - B(:,:,:,1) * tc1(:,:,:)
+
+    ! TODO: save the x-convective terms already in dux1, duy1, duz1
+
+    call transpose_x_to_y(ux1,ux2)
+    call transpose_x_to_y(uy1,uy2)
+    call transpose_x_to_y(uz1,uz2)
+    
+    call transpose_x_to_y(B(:,:,:,1),bx2)
+    call transpose_x_to_y(B(:,:,:,2),by2)
+    call transpose_x_to_y(B(:,:,:,3),bz2)
+
+
+    !WORK Y-PENCILS
+    td2(:,:,:) =  uy2(:,:,:)*bx2(:,:,:) - by2(:,:,:)*ux2(:,:,:) 
+    te2(:,:,:) =  uy2(:,:,:)*by2(:,:,:) - by2(:,:,:)*uy2(:,:,:) 
+    tf2(:,:,:) =  uy2(:,:,:)*bz2(:,:,:) - by2(:,:,:)*uz2(:,:,:) 
+
+    call dery (tg2,td2,di2,sy,ffy,  fsy, fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcx*ubcy)
+    call dery (th2,te2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcy*ubcy)
+    call dery (ti2,tf2,di2,sy,ffy,  fsy, fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcz*ubcy)
+
+    call dery (td2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+    call dery (te2,uy2,di2,sy,ffy,  fsy ,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+    call dery (tf2,uz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+
+    call dery (tx2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+    call dery (ty2,by2,di2,sy,ffy,  fsy ,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+    call dery (tz2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+
+
+    ! Convective terms of y-pencil in tg2,th2,ti2
+
+    tg2(:,:,:) = tg2(:,:,:)  + uy2(:,:,:) * tx2(:,:,:) - by2(:,:,:) * td2(:,:,:)
+    th2(:,:,:) = th2(:,:,:)  + uy2(:,:,:) * ty2(:,:,:) - by2(:,:,:) * te2(:,:,:)
+    ti2(:,:,:) = ti2(:,:,:)  + uy2(:,:,:) * tz2(:,:,:) - by2(:,:,:) * tf2(:,:,:)
+
+    call transpose_y_to_z(ux2,ux3)
+    call transpose_y_to_z(uy2,uy3)
+    call transpose_y_to_z(uz2,uz3)
+
+    call transpose_y_to_z(bx2,bx3)
+    call transpose_y_to_z(by2,by3)
+    call transpose_y_to_z(bz2,bz3)
+
+    !WORK Z-PENCILS
+
+    td3(:,:,:) =  uz3(:,:,:)*bx3(:,:,:) - bz3(:,:,:)*ux3(:,:,:)
+    te3(:,:,:) =  uz3(:,:,:)*by3(:,:,:) - bz3(:,:,:)*uy3(:,:,:)
+    tf3(:,:,:) =  uz3(:,:,:)*bz3(:,:,:) - bz3(:,:,:)*uz3(:,:,:)
+
+
+    call derz (tg3,td3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcx*ubcz)
+    call derz (th3,te3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcy*ubcz)
+    call derz (ti3,tf3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcz*ubcz)
+
+    call derz (td3,ux3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derz (te3,uy3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derz (tf3,uz3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcz)
+
+    call derz (tx3,bx3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derz (ty3,by3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derz (tz3,bz3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcz)
+
+    ! Convective terms of z-pencil in ta3,tb3,tc3
+
+    ta3(:,:,:) = tg3(:,:,:) + uz3(:,:,:) * tx3(:,:,:) - bz3(:,:,:) * td3(:,:,:)
+    tb3(:,:,:) = th3(:,:,:) + uz3(:,:,:) * ty3(:,:,:) - bz3(:,:,:) * te3(:,:,:)
+    tc3(:,:,:) = ti3(:,:,:) + uz3(:,:,:) * tz3(:,:,:) - bz3(:,:,:) * tf3(:,:,:)
+
+
+    ! Convective terms of z-pencil are in ta3 -> td3, tb3 -> te3, tc3 -> tf3
+    td3(:,:,:) = ta3(:,:,:)
+    te3(:,:,:) = tb3(:,:,:)
+    tf3(:,:,:) = tc3(:,:,:)
+
+    !DIFFUSIVE TERMS IN Z
+    call derzz (ta3,bx3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derzz (tb3,by3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derzz (tc3,bz3,di3,sz,sfz ,ssz ,swz ,zsize(1),zsize(2),zsize(3),0,ubcz)
+
+
+    ! Add convective and diffusive terms of z-pencil (half for skew-symmetric)
+
+    td3(:,:,:) = rrem*ta3(:,:,:) - half * td3(:,:,:)
+    te3(:,:,:) = rrem*tb3(:,:,:) - half * te3(:,:,:)
+    tf3(:,:,:) = rrem*tc3(:,:,:) - half * tf3(:,:,:)
+
+
+    !WORK Y-PENCILS
+    call transpose_z_to_y(td3,td2)
+    call transpose_z_to_y(te3,te2)
+    call transpose_z_to_y(tf3,tf2)
+
+    ! Convective terms of y-pencil (tg2,th2,ti2) and sum of convective and diffusive terms of z-pencil (td2,te2,tf2) are now in tg2, th2, ti2 (half for skew-symmetric)
+    tg2(:,:,:) = td2(:,:,:) - half * tg2(:,:,:)
+    th2(:,:,:) = te2(:,:,:) - half * th2(:,:,:)
+    ti2(:,:,:) = tf2(:,:,:) - half * ti2(:,:,:)
+
+
+    !DIFFUSIVE TERMS IN Y
+    if (iimplicit.le.0) then
+       !-->for ux
+       call deryy (td2,bx2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1,ubcx)
+       if (istret.ne.0) then
+          call dery (te2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+          do k = 1,ysize(3)
+             do j = 1,ysize(2)
+                do i = 1,ysize(1)
+                   td2(i,j,k) = td2(i,j,k)*pp2y(j)-pp4y(j)*te2(i,j,k)
+                enddo
+             enddo
+          enddo
+       endif
+
+       !-->for uy
+       call deryy (te2,by2,di2,sy,sfy,ssy,swy,ysize(1),ysize(2),ysize(3),0,ubcy)
+       if (istret.ne.0) then
+          call dery (tf2,by2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+          do k = 1,ysize(3)
+             do j = 1,ysize(2)
+                do i = 1,ysize(1)
+                   te2(i,j,k) = te2(i,j,k)*pp2y(j)-pp4y(j)*tf2(i,j,k)
+                enddo
+             enddo
+          enddo
+       endif
+
+       !-->for uz
+       call deryy (tf2,bz2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1,ubcz)
+       if (istret.ne.0) then
+          call dery (tj2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+          do k = 1,ysize(3)
+             do j = 1,ysize(2)
+                do i = 1,ysize(1)
+                   tf2(i,j,k) = tf2(i,j,k)*pp2y(j)-pp4y(j)*tj2(i,j,k)
+                enddo
+             enddo
+          enddo
+       endif
+    else ! (semi)implicit Y diffusion
+       if (istret.ne.0) then
+
+          !-->for ux
+          call dery (te2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+          do k=1,ysize(3)
+             do j=1,ysize(2)
+                do i=1,ysize(1)
+                   td2(i,j,k)=-pp4y(j)*te2(i,j,k)
+                enddo
+             enddo
+          enddo
+          !-->for uy
+          call dery (tf2,by2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+          do k=1,ysize(3)
+             do j=1,ysize(2)
+                do i=1,ysize(1)
+                   te2(i,j,k)=-pp4y(j)*tf2(i,j,k)
+                enddo
+             enddo
+          enddo
+          !-->for uz
+          call dery (tj2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+          do k=1,ysize(3)
+             do j=1,ysize(2)
+                do i=1,ysize(1)
+                   tf2(i,j,k)=-pp4y(j)*tj2(i,j,k)
+                enddo
+             enddo
+          enddo
+
+       else
+       
+          td2(:,:,:) = zero
+          te2(:,:,:) = zero
+          tf2(:,:,:) = zero
+          
+       endif
+    endif
+
+    ! Add diffusive terms of y-pencil to convective and diffusive terms of y- and z-pencil
+    ta2(:,:,:) = rrem*td2(:,:,:) + tg2(:,:,:)
+    tb2(:,:,:) = rrem*te2(:,:,:) + th2(:,:,:)
+    tc2(:,:,:) = rrem*tf2(:,:,:) + ti2(:,:,:)
+
+    !WORK X-PENCILS
+    call transpose_y_to_x(ta2,ta1)
+    call transpose_y_to_x(tb2,tb1)
+    call transpose_y_to_x(tc2,tc1) !diff+conv. terms
+
+    !DIFFUSIVE TERMS IN X
+    call derxx (td1,ux1,di1,sx,sfx ,ssx ,swx ,xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derxx (te1,uy1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derxx (tf1,uz1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+
+    td1(:,:,:) = rrem * td1(:,:,:)
+    te1(:,:,:) = rrem * te1(:,:,:)
+    tf1(:,:,:) = rrem * tf1(:,:,:)
+
+    !FINAL SUM: DIFF TERMS + CONV TERMS
+    dB(:,:,:,1) = ta1(:,:,:) - half*tg1(:,:,:)  + td1(:,:,:)
+    dB(:,:,:,2) = tb1(:,:,:) - half*th1(:,:,:)  + te1(:,:,:)
+    dB(:,:,:,3) = tc1(:,:,:) - half*ti1(:,:,:)  + tf1(:,:,:)
+
+    return
+
+  end subroutine mhd_rhs_eq
+  !
+  subroutine solve_poisson_mhd
+    !
+    use decomp_2d, only : mytype, xsize, zsize, ph1, nrank
+    use decomp_2d_poisson, only : poisson
+    use var, only : nzmsize,dv3
+    use param, only : ntime, nrhotime, npress,ilmn, ivarcoeff, zero, one 
+    use navier,only : gradp
+
+    real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: phib
+    
+    real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: div3
+
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3),1:3) :: dphib
+
+    integer :: i,j,k,nlock
+    logical :: converged
+    !
+    nlock=1
+    !
+    phib=divergence_sclar(Bm,nlock)
+    !
+    converged=.false.
+    !
+    do while(.not.converged)
+      !
+      call poisson(phib)
+      !
+      CALL gradp(dphib(:,:,:,1),dphib(:,:,:,2),dphib(:,:,:,3),phib)
+      !
+      converged=.true.
+      !
+    enddo
+    !
+    Bm=Bm-dphib
+    !
+  end subroutine solve_poisson_mhd
+  !
+  subroutine solve_poisson_mhd2(rho1, ep1, drho1, divu3)
+
+    USE decomp_2d, ONLY : mytype, xsize, zsize, ph1, nrank, real_type
+    USE decomp_2d_poisson, ONLY : poisson
+    USE var, ONLY : nzmsize,dv3
+    USE param, ONLY : ntime, nrhotime, npress,ilmn, ivarcoeff, zero, one 
+    USE mpi
+    use navier,only : gradp,velocity_to_momentum,divergence
+    
+    implicit none
+
+    !! Inputs
+    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)), INTENT(IN) :: ep1
+    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), nrhotime), INTENT(IN) :: rho1
+    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), ntime), INTENT(IN) :: drho1
+    REAL(mytype), DIMENSION(zsize(1), zsize(2), zsize(3)), INTENT(IN) :: divu3
+
+    !! Outputs
+    REAL(mytype), DIMENSION(ph1%zst(1):ph1%zen(1), ph1%zst(2):ph1%zen(2), nzmsize, npress) :: pp3
+    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)) :: px1, py1, pz1
+
+    !! Locals
+    INTEGER :: nlock, poissiter
+    LOGICAL :: converged
+    REAL(mytype) :: atol, rtol, rho0, divup3norm
+
+
+    nlock = 1 !! Corresponds to computing div(u*)
+    converged = .FALSE.
+    poissiter = 0
+    rho0 = one
+
+
+
+    CALL divergence(pp3(:,:,:,1),rho1,Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),ep1,drho1,divu3,nlock,identifier='B')
+    !
+    IF (ilmn.AND.ivarcoeff) THEN
+       dv3(:,:,:) = pp3(:,:,:,1)
+    ENDIF
+
+    do while(.not.converged)
+
+       IF (.NOT.converged) THEN
+          CALL poisson(pp3(:,:,:,1))
+
+
+          !! Need to update pressure gradient here for varcoeff
+          CALL gradp(px1,py1,pz1,pp3(:,:,:,1))
+
+         
+
+          IF ((.NOT.ilmn).OR.(.NOT.ivarcoeff)) THEN
+             !! Once-through solver
+             !! - Incompressible flow
+             !! - LMN - constant-coefficient solver
+             converged = .TRUE.
+          ENDIF
+       ENDIF
+
+       poissiter = poissiter + 1
+    enddo
+
+
+    Bm(:,:,:,1)=Bm(:,:,:,1)-px1
+    Bm(:,:,:,2)=Bm(:,:,:,2)-py1
+    Bm(:,:,:,3)=Bm(:,:,:,3)-pz1
+
+    sync_Bm_needed=.true.
+    !
+  end subroutine solve_poisson_mhd2
+  !
+  subroutine  div_check(divec,divmax,divmean)
     !
     USE decomp_2d
     use partack, only: psum,pmax
     !
     real(mytype),intent(in) :: divec(:,:,:)
+    real(mytype),intent(out) :: divmax,divmean
     !
     integer :: i,j,k
     real(mytype) :: tmax,tmoy
@@ -380,9 +913,12 @@ module mhd
     tmax=pmax(tmax)
     tmoy=psum(tmoy)
     !
-    if (nrank == 0) then
-       write(*,*) 'DIV J max mean=',real(tmax,mytype),real(tmoy/real(nproc),mytype)
-    endif
+    divmax=tmax
+    divmean=tmoy
+
+    ! if (nrank == 0) then
+    !    write(*,*) 'DIV max mean=',real(tmax,mytype),real(tmoy/real(nproc),mytype)
+    ! endif
     !
   end subroutine
   !
@@ -425,7 +961,7 @@ module mhd
     tmoy=psum(tmoy)
     !
     if (nrank == 0) then
-       write(*,*) 'DIV J max mean=',real(tmax,mytype),real(tmoy/real(nproc),mytype)
+       write(*,*) 'DIV max mean=',real(tmax,mytype),real(tmoy/real(nproc),mytype)
     endif
     !
   end subroutine  divergence_vmesh_check
@@ -549,11 +1085,6 @@ module mhd
     !WORK X-PENCILS
 
     call derxvp(pp1,ta1,di1,sx,cfx6,csx6,cwx6,xsize(1),nxmsize,xsize(2),xsize(3),0)
-
-    if (ilmn.and.(nlock.gt.0)) then
-       call interxvp(pgy1,ta1,di1,sx,cifxp6,cisxp6,ciwxp6,xsize(1),nxmsize,xsize(2),xsize(3),1)
-       pp1(:,:,:) = pp1(:,:,:) + pgy1(:,:,:)
-    endif
 
     call interxvp(pgy1,tb1,di1,sx,cifxp6,cisxp6,ciwxp6,xsize(1),nxmsize,xsize(2),xsize(3),1)
     call interxvp(pgz1,tc1,di1,sx,cifxp6,cisxp6,ciwxp6,xsize(1),nxmsize,xsize(2),xsize(3),1)

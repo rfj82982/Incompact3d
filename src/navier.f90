@@ -256,7 +256,7 @@ contains
   ! output : pp3 (on pressure mesh)
   !written by SL 2018
   !############################################################################
-  subroutine divergence (pp3,rho1,ux1,uy1,uz1,ep1,drho1,divu3,nlock)
+  subroutine divergence (pp3,rho1,ux1,uy1,uz1,ep1,drho1,divu3,nlock,identifier)
 
     USE param
     USE decomp_2d
@@ -279,9 +279,19 @@ contains
     real(mytype),dimension(zsize(1),zsize(2),zsize(3)),intent(in) :: divu3
     real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: pp3
 
+    character(len=1),intent(in),optional :: identifier
+
     integer :: nvect3,i,j,k,nlock
     integer :: code
     real(mytype) :: tmax,tmoy,tmax1,tmoy1
+
+    character(len=1) :: iden
+
+    iden='U'
+    if(present(identifier)) then
+      iden=identifier
+    endif
+
 
     nvect3=(ph1%zen(1)-ph1%zst(1)+1)*(ph1%zen(2)-ph1%zst(2)+1)*nzmsize
 
@@ -362,9 +372,9 @@ contains
 
     if ((nrank == 0) .and. (nlock > 0).and.(mod(itime, ilist) == 0 .or. itime == ifirst .or. itime==ilast)) then
        if (nlock == 2) then
-          write(*,*) 'DIV U  max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
+          write(*,*) 'DIV ',iden,'  max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
        else
-          write(*,*) 'DIV U* max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
+          write(*,*) 'DIV ',iden,'* max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
        endif
     endif
 

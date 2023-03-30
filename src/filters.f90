@@ -47,6 +47,9 @@ subroutine filter(af)
        fialny,fiany,fibny,ficny,fidny,fialmy,fiamy,fibmy,ficmy,fidmy,fialpy,fiapy,fibpy,ficpy,fidpy,fiepy,fifpy,&
        fialjy,fiajy,fibjy,ficjy,fidjy,fiffy,fifsy,fifwy,fiffyp,fifsyp,fifwyp,ny,ncly1,nclyn)
   ! Set coefficients for z-direction filter
+  
+  if(nz<=1) return
+
   call set_filter_coefficients(af,fial1z,fia1z,fib1z,fic1z,fid1z,fial2z,fia2z,fib2z,fic2z,fid2z,fial3z,fia3z,fib3z,fic3z,fid3z,fie3z,fif3z,&
        fialnz,fianz,fibnz,ficnz,fidnz,fialmz,fiamz,fibmz,ficmz,fidmz,fialpz,fiapz,fibpz,ficpz,fidpz,fiepz,fifpz,&
        fialkz,fiakz,fibkz,fickz,fidkz,fiffz,fifsz,fifwz,fiffzp,fifszp,fifwzp,nz,nclz1,nclzn)

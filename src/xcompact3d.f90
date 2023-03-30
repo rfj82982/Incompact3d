@@ -51,6 +51,7 @@ program xcompact3d
   use genepsi, only : genepsi3d
   use partack,only : lpartack,particle_velo,write_particle,h5write_particle, &
                      ipartiout,numparticle, partile_inject,numpartix,intt_particel
+  use mhd,    only : Bm,mhd_active,test_magnetic,solve_poisson_mhd,solve_poisson_mhd2
 
   implicit none
 
@@ -75,7 +76,17 @@ program xcompact3d
      if ((itype.eq.itype_abl.or.iturbine.ne.0).and.(ifilter.ne.0).and.(ilesmod.ne.0)) then
         call filter(C_filter)
         call apply_spatial_filter(ux1,uy1,uz1,phi1)
+        !
      endif
+
+     ! if(ifilter.ne.0) then
+
+     !    if(mhd_active) then
+     !      call filter(C_filter)
+     !      call apply_spatial_filter(Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),phi1)
+     !    endif
+
+     !  endif
 
      do itr=1,iadvance_time
 
@@ -105,7 +116,12 @@ program xcompact3d
 
         call calc_divu_constraint(divu3,rho1,phi1)
         call solve_poisson(pp3,px1,py1,pz1,rho1,ux1,uy1,uz1,ep1,drho1,divu3)
+
         call cor_vel(ux1,uy1,uz1,px1,py1,pz1)
+
+        if(mhd_active) then
+          call solve_poisson_mhd2(rho1,ep1,drho1,divu3)
+        endif
 
         if (ilmn) then
            call momentum_to_velocity(rho1,ux1,uy1,uz1)
@@ -114,6 +130,8 @@ program xcompact3d
         endif
         
         call test_flow(rho1,ux1,uy1,uz1,phi1,ep1,drho1,divu3)
+
+        if(mhd_active) call test_magnetic
 
         if(lpartack) call intt_particel(ux1,uy1,uz1,t)
 
@@ -263,6 +281,12 @@ subroutine init_xcompact3d()
   endif
 
   !####################################################################
+  ! initialise mhd
+  if(mhd_active) then
+    call mhd_init()
+  endif
+
+  !####################################################################
   ! initialise visu
   if (ivisu.ne.0) then
      call visu_init()
@@ -304,10 +328,6 @@ subroutine init_xcompact3d()
     call local_domain_size()
     !
     call init_particle()
-  endif
-
-  if(mhd_active) then
-    call mhd_init()
   endif
 
   call simu_stats(1)
