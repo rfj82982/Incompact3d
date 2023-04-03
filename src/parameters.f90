@@ -231,7 +231,7 @@ subroutine parameter(input_i3d)
   close(10)
 
   ! particle tracking activation
-  ! numparticle=numpartix(1)*numpartix(2)*numpartix(3)
+  numparticle=numpartix(1)*numpartix(2)*numpartix(3)
   if(numpartix(1)*numpartix(2)*numpartix(3) .ne. 0) lpartack=.true.
 
   ! allocate(sc(numscalar),cp(numscalar),ri(numscalar),group(numscalar))

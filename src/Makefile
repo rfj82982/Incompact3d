@@ -77,8 +77,8 @@ test/fast: test
 
 # Special rule for the target edit_cache
 edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
+	/usr/bin/ccmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -1049,6 +1049,30 @@ module_param.f90.s:
 	cd /mnt/d/WORK/xcompact/Incompact3d && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/xcompact3d.dir/build.make src/CMakeFiles/xcompact3d.dir/module_param.f90.s
 .PHONY : module_param.f90.s
 
+mptool.o: mptool.f90.o
+.PHONY : mptool.o
+
+# target to build an object file
+mptool.f90.o:
+	cd /mnt/d/WORK/xcompact/Incompact3d && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/xcompact3d.dir/build.make src/CMakeFiles/xcompact3d.dir/mptool.f90.o
+.PHONY : mptool.f90.o
+
+mptool.i: mptool.f90.i
+.PHONY : mptool.i
+
+# target to preprocess a source file
+mptool.f90.i:
+	cd /mnt/d/WORK/xcompact/Incompact3d && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/xcompact3d.dir/build.make src/CMakeFiles/xcompact3d.dir/mptool.f90.i
+.PHONY : mptool.f90.i
+
+mptool.s: mptool.f90.s
+.PHONY : mptool.s
+
+# target to generate assembly for a file
+mptool.f90.s:
+	cd /mnt/d/WORK/xcompact/Incompact3d && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/xcompact3d.dir/build.make src/CMakeFiles/xcompact3d.dir/mptool.f90.s
+.PHONY : mptool.f90.s
+
 navier.o: navier.f90.o
 .PHONY : navier.o
 
@@ -1507,6 +1531,9 @@ help:
 	@echo "... module_param.o"
 	@echo "... module_param.i"
 	@echo "... module_param.s"
+	@echo "... mptool.o"
+	@echo "... mptool.i"
+	@echo "... mptool.s"
 	@echo "... navier.o"
 	@echo "... navier.i"
 	@echo "... navier.s"

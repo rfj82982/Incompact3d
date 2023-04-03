@@ -41,6 +41,7 @@ add_executable(xcompact3d
                     les_models.f90
                     mhd.f90
                     module_param.f90
+                    mptool.f90
                     navier.f90
                     parameters.f90
                     particle.f90

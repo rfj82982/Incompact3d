@@ -338,7 +338,7 @@ contains
   subroutine write_xdmf_header(pathname, filename, num)
 
     use variables, only : nvisu, yp
-    use param, only : dx,dy,dz,istret
+    use param, only : dx,dy,dz,istret,t
     use decomp_2d, only : mytype, nrank, xszV, yszV, zszV, ystV
 
     implicit none
@@ -420,6 +420,7 @@ contains
         write(ioxdmf,*)'    </Geometry>'
       endif
       write(ioxdmf,'(A, I0, A)')'    <Grid Name="', num, '" GridType="Uniform">'
+      write(ioxdmf,'(A,F12.6,A)')'        <Time Value="',t,'" />'
       write(ioxdmf,*)'        <Topology Reference="/Xdmf/Domain/Topology[1]"/>'
       write(ioxdmf,*)'        <Geometry Reference="/Xdmf/Domain/Geometry[1]"/>'
     endif

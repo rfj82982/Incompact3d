@@ -210,7 +210,7 @@ contains
     use param
     use MPI
     use navier, only : gradp
-    use partack,only : lpartack,particle_file_numb,ptime
+    use partack,only : lpartack,particle_file_numb
 
     implicit none
 

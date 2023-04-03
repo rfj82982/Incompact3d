@@ -9,21 +9,8 @@
 module partack
   !
   use decomp_2d, only : mytype,nrank,nproc
-  use hdf5
-  use h5lt
-  !
-  implicit none
-  !
-  interface psum
-    module procedure psum_mytype_ary
-    module procedure psum_integer
-    module procedure psum_mytype
-  end interface
-  !
-  interface pmax
-    module procedure pmax_int
-    module procedure pmax_mytype
-  end interface
+  use mptool
+  use constants, only : pi
   !
   interface mclean
     module procedure mclean_mytype
@@ -35,11 +22,6 @@ module partack
     module procedure size_integer
   end interface msize
   !
-  interface ptabupd
-    module procedure ptable_update_int_arr
-    module procedure updatable_int
-  end interface ptabupd
-  !
   interface pa2a
     module procedure pa2a_particle
   end interface pa2a
@@ -48,29 +30,11 @@ module partack
      module procedure extend_particle
   end interface mextend
   !
-  Interface h5write
-    !
-    module procedure h5wa_r8
-    module procedure h5w_real8
-    module procedure h5w_int4
-    !
-  end Interface h5write
-  !
-  Interface h5sread
-    !
-    module procedure h5_readarray1d
-    module procedure h5_read1rl8
-    module procedure h5_read1int
-    !
-  end Interface h5sread
-  !
-  interface pgather
-    module procedure pgather_int
-  end interface
   ! particles
   type partype
     !
-    real(mytype) :: rho,mas,dim,re,vdiff,x(3),v(3),vf(3),f(3)
+    real(mytype) :: rho,mas,dim,re,vdiff,qe
+    real(mytype) :: x(3),v(3),vf(3),f(3),b(3)
     real(mytype),allocatable,dimension(:,:) :: dx,dv
     integer :: id,rankinn,rank2go
     logical :: swap,new
@@ -81,10 +45,12 @@ module partack
     !|               Re | particle Reynolds number.                |
     !|            vdiff | velocity difference between fluid and    |
     !|                  | particle                                 |
+    !|               qe | Electric charge                          |
     !|                x | spatial coordinates of particle          |
     !|                v | velocity of particle                     |
     !|               vf | velocity of fluids                       |
     !|                f | force                                    |
+    !|                b | magnetic field                           |
     !|               dx | gradient of x,y,z to time, used for      |
     !|                  | temporal integration.                    |
     !|               dv | gradient of u,v,w to time, used for      |
@@ -105,14 +71,13 @@ module partack
   !
   type(partype),allocatable,target :: particle(:)
   !
-  logical :: lpartack
+  logical :: lpartack,lorentzforce
   integer :: numparticle,ipartiout,ipartiadd,particle_file_numb
   real(mytype) :: partirange(6)
   integer :: numpartix(3)
   real(mytype),allocatable,dimension(:) :: lxmin,lxmax,lymin,lymax,lzmin,lzmax
   real(mytype),allocatable,dimension(:) :: xpa,ypa,zpa
   real(mytype),allocatable,dimension(:) :: ux_pa,uy_pa,uz_pa
-  character(len=4) :: rankname
   real(mytype) :: sub_time_step,particletime
   real(mytype) :: part_time,part_comm_time,part_vel_time,part_dmck_time,a2a_time, &
                   count_time,data_pack_time,data_unpack_time,mpi_comm_time,       &
@@ -128,9 +93,6 @@ module partack
   !|            uy_pa |                                            |
   !|            uz_pa | velocity of particles                      |
   !+------------------+--------------------------------------------+
-  !
-  integer(hid_t) :: h5file_id
-  integer :: mpi_comm_particle,mpi_rank_part,mpi_size_part
   !
   contains
   !
@@ -160,8 +122,10 @@ module partack
     pa%dx=0.0
     pa%dv=0.0
     !
-    pa%dim=1.d-4
-    pa%rho=10.d0
+    pa%dim=1.d-2
+    pa%rho=1000._mytype
+    !
+    pa%qe=1.d-5
     !
   end subroutine init_one_particle
   !+-------------------------------------------------------------------+
@@ -317,9 +281,12 @@ module partack
       y=dy*real(j,mytype)+partirange(3)
       z=dz*real(k,mytype)+partirange(5)
       !
-      if( x>=lxmin(nrank) .and. x<lxmax(nrank) .and. &
-          y>=lymin(nrank) .and. y<lymax(nrank) .and. &
-          z>=lzmin(nrank) .and. z<lzmax(nrank) ) then
+      ! print*,x,y,z
+      ! print*,(y>=lymin(nrank) .and. y<=lymax(nrank))
+      !
+      if( x>=lxmin(nrank) .and. x<=lxmax(nrank) .and. &
+          y>=lymin(nrank) .and. y<=lymax(nrank) .and. &
+          z>=lzmin(nrank) .and. z<=lzmax(nrank) ) then
         !
         p=p+1
         !
@@ -376,7 +343,8 @@ module partack
       call h5read_particle(particle,numparticle)
     endif
     !
-    call partical_domain_check('bc_channel')
+    call partical_domain_check('bc_tgv')
+    ! call partical_domain_check('bc_channel')
     !
     !
     ! call partical_swap
@@ -396,7 +364,9 @@ module partack
     h5io_time=0.d0
     !
     particletime=t
-    sub_time_step=0.01d0*dt
+    sub_time_step=0.005d0*dt
+    !
+    lorentzforce=.true.
     !
   end subroutine init_particle
   !+-------------------------------------------------------------------+
@@ -464,7 +434,7 @@ module partack
     !
     if (istret==0) then
       lymin(nrank)=real(xstart(2)-1,mytype)*dy
-      lymax(nrank)=real(xend(2)-2,mytype)*dy
+      lymax(nrank)=real(xend(2),mytype)*dy
     else
       lymin(nrank)=yp(xstart(2))
       nyr=min(ny,xend(2)+1)
@@ -492,11 +462,20 @@ module partack
   ! The end of the subroutine local_domain_size                        |
   !+-------------------------------------------------------------------+
   !!
-  subroutine particle_velo(ux1,uy1,uz1)
+  !+-------------------------------------------------------------------+
+  !| This subroutine is to calculate the force on particles.           |
+  !+-------------------------------------------------------------------+
+  !| CHANGE RECORD                                                     |
+  !| -------------                                                     |
+  !| 15-11-2021  | Created by J. Fang                                  |
+  !| 01-04-2023  | Add lorentz force by J. Fang                        |
+  !+-------------------------------------------------------------------+
+  subroutine particle_force(ux1,uy1,uz1)
     !
     use decomp_2d, only : xsize
     use var,       only : itime
     use param,     only : re,t,itr
+    use mhd,       only : Bm,stuart
     !
     ! arguments
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(in) :: ux1,uy1,uz1
@@ -504,7 +483,7 @@ module partack
     ! local data
     integer :: psize,jpart,npart
     type(partype),pointer :: pa
-    real(mytype) :: varc,maxforce,maxvdiff,vdiff,re_p
+    real(mytype) :: varc,vard,varq(3),maxforce,maxvdiff,vdiff,re_p
     !
     logical,save :: firstcal=.true.
     !
@@ -516,7 +495,11 @@ module partack
       !
     endif
     !
-    call fluid_velo(ux1,uy1,uz1)
+    if(lorentzforce) then
+      call field_var(ux1,uy1,uz1,Bm)
+    else
+      call field_var(ux1,uy1,uz1)
+    endif
     !
     psize=msize(particle)
     !
@@ -534,6 +517,10 @@ module partack
       pa=>particle(jpart)
       !
       if(pa%new) cycle
+      !
+      ! ! tracking particles
+      ! pa%v=pa%vf
+      ! pa%f(:)=0.d0
       !
       vdiff = norm2(pa%vf-pa%v)
       !
@@ -556,9 +543,32 @@ module partack
       ! varc=18.d0/(pa%rho*pa%dim*re_p)*(1.d0+0.15d0*re_p**0.687d0)*vdiff
       !
       pa%f(:) = varc*(pa%vf(:)-pa%v(:))
+      ! pa%f(:) = 0.d0
       !
       maxforce=max(maxforce,abs(pa%f(1)),abs(pa%f(2)),abs(pa%f(3)))
       maxvdiff=max(maxvdiff,vdiff)
+      !
+      if(lorentzforce) then
+
+        vard = 6.d0/(pi*(pa%dim**3)*pa%rho)*stuart*pa%qe
+
+        varq(:) = cross_product(pa%v(:),pa%b(:))
+
+        pa%f(:) = pa%f(:) + vard*varq(:)
+
+        if(isnan(pa%f(1)).or. isnan(pa%f(2)).or.isnan(pa%f(3))) then
+          print*,' !! error in calculating force !!'
+          print*,'  varc:',varc,'  vard:',vard
+          print*,'    vf:',pa%vf
+          print*,'     v:',pa%v
+          print*,'     b:',pa%b
+          print*,'    vq:',varq
+          stop
+        endif
+
+        ! print*,jpart,'|',varc*varq(:)
+
+      endif
       !
       ! print*,'** particle--',jpart,pa%vf(1),pa%v(1),pa%f(1)
       ! if(nrank==3 .and. jpart==38) then
@@ -596,7 +606,10 @@ module partack
       !
     endif
     !
-  end subroutine particle_velo
+  end subroutine particle_force
+  !+-------------------------------------------------------------------+
+  ! The end of the subroutine particle_force                           |
+  !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
   !| This subroutine is to get the fluids velocity on particles.       |
@@ -605,7 +618,7 @@ module partack
   !| -------------                                                     |
   !| 15-11-2021  | Created by J. Fang                                  |
   !+-------------------------------------------------------------------+
-  subroutine fluid_velo(ux1,uy1,uz1)
+  subroutine field_var(ux1,uy1,uz1,B)
     !
     use MPI
     use param,     only : dx,dy,dz,istret,nclx,ncly,nclz,xlx,yly,zlz
@@ -614,6 +627,7 @@ module partack
     use actuator_line_model_utils
     !
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(in) :: ux1,uy1,uz1
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3),1:3),intent(in),optional :: B
     !
     ! local data
     integer :: jpart,npart,i,j,k,psize
@@ -623,6 +637,7 @@ module partack
     real(mytype),allocatable,dimension(:,:,:) :: ux1_halo,uy1_halo,    &
                                                  uz1_halo,ux1_hal2,    &
                                                  uy1_hal2,uz1_hal2
+    real(mytype),allocatable :: b_halo(:,:,:,:)
     !
     real(mytype),allocatable,save :: xx(:),yy(:),zz(:)
     logical,save :: firstcal=.true.
@@ -649,9 +664,14 @@ module partack
         endif
         !
       enddo
-      do k=0,xsize(3)+1
-        zz(k)=real((k+xstart(3)-2),mytype)*dz
-      enddo
+      !
+      if(xsize(3)==1) then
+        zz(:)=0.d0
+      else
+        do k=0,xsize(3)+1
+          zz(k)=real((k+xstart(3)-2),mytype)*dz
+        enddo
+      endif
       !
       firstcal=.false.
       !
@@ -665,6 +685,16 @@ module partack
     call pswap_yz(uy1,uy1_halo)
     call pswap_yz(uz1,uz1_halo)
     !
+    if(present(B)) then
+      !
+      allocate( b_halo(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1,1:3) )
+      !
+      call pswap_yz(b(:,:,:,1),b_halo(:,:,:,1))
+      call pswap_yz(b(:,:,:,2),b_halo(:,:,:,2))
+      call pswap_yz(b(:,:,:,3),b_halo(:,:,:,3))
+      !
+    endif
+    !
     psize=msize(particle)
     !
     npart=0
@@ -676,6 +706,7 @@ module partack
       if(pa%new) cycle
       !
       loopk: do k=1,xsize(3)
+        !
         z1=zz(k)
         z2=zz(k+1)
         !
@@ -686,9 +717,9 @@ module partack
             x1=xx(i)
             x2=xx(i+1)
             !
-            if( pa%x(1)>=x1 .and. pa%x(1)<x2 .and. &
-                pa%x(2)>=y1 .and. pa%x(2)<y2 .and. &
-                pa%x(3)>=z1 .and. pa%x(3)<z2 ) then
+            if( pa%x(1)>=x1 .and. pa%x(1)<=x2 .and. &
+                pa%x(2)>=y1 .and. pa%x(2)<=y2 .and. &
+                pa%x(3)>=z1 .and. pa%x(3)<=z2 ) then
               !
               ! locate the particle, do the interpolation
               ! print*,x1,x2,y1,y2,z1,z2
@@ -703,6 +734,17 @@ module partack
                                             ux1_halo(i+1,j+1,k), &
                                             ux1_halo(i,j+1,k+1), &
                                             ux1_halo(i+1,j+1,k+1))
+              !
+              if(isnan(pa%vf(1))) then
+                print*,' !! error in calculating vf x'
+                print*,'        x1:',x1,y1,z1
+                print*,'        x2:',x2,y2,z2
+                print*,'      pa%x:',pa%x
+                print*,'      rank:',nrank,'i,j,k',i,j,k
+                print*,'  ux1_halo:',ux1_halo(i:i+1,j:j+1,k:k+1)
+                stop
+              endif
+              !
               pa%vf(2)=trilinear_interpolation( x1,y1,z1,           &
                                                x2,y2,z2,            &
                                             pa%x(1),pa%x(2),pa%x(3),&
@@ -714,6 +756,17 @@ module partack
                                             uy1_halo(i+1,j+1,k), &
                                             uy1_halo(i,j+1,k+1), &
                                             uy1_halo(i+1,j+1,k+1)) 
+              !
+              if(isnan(pa%vf(2))) then
+                print*,' !! error in calculating vf y'
+                print*,'        x1:',x1,y1,z1
+                print*,'        x2:',x2,y2,z2
+                print*,'      pa%x:',pa%x
+                print*,'      rank:',nrank,'i,j,k',i,j,k
+                print*,'  ux1_halo:',uy1_halo(i:i+1,j:j+1,k:k+1)
+                stop
+              endif
+              !
               pa%vf(3)=trilinear_interpolation( x1,y1,z1,            &
                                                 x2,y2,z2,            &
                                             pa%x(1),pa%x(2),pa%x(3), &
@@ -725,6 +778,67 @@ module partack
                                             uz1_halo(i+1,j+1,k), &
                                             uz1_halo(i,j+1,k+1), &
                                             uz1_halo(i+1,j+1,k+1)) 
+              !
+              if(isnan(pa%vf(3))) then
+                print*,' !! error in calculating vf z'
+                print*,'        x1:',x1,y1,z1
+                print*,'        x2:',x2,y2,z2
+                print*,'      pa%x:',pa%x
+                print*,'      rank:',nrank,'i,j,k',i,j,k
+                print*,'  ux1_halo:',uz1_halo(i:i+1,j:j+1,k:k+1)
+                stop
+              endif
+              !
+              !
+              if(present(B)) then
+                !
+                pa%b(1)=trilinear_interpolation( x1,y1,z1,            &
+                                                  x2,y2,z2,            &
+                                              pa%x(1),pa%x(2),pa%x(3), &
+                                              b_halo(i,j,k,1),     &
+                                              b_halo(i+1,j,k,1),   &
+                                              b_halo(i,j,k+1,1),   &
+                                              b_halo(i+1,j,k+1,1), &
+                                              b_halo(i,j+1,k,1),   &
+                                              b_halo(i+1,j+1,k,1), &
+                                              b_halo(i,j+1,k+1,1), &
+                                              b_halo(i+1,j+1,k+1,1))
+                pa%b(2)=trilinear_interpolation( x1,y1,z1,            &
+                                                 x2,y2,z2,            &
+                                              pa%x(1),pa%x(2),pa%x(3),&
+                                              b_halo(i,j,k,2),        &
+                                              b_halo(i+1,j,k,2),   &
+                                              b_halo(i,j,k+1,2),   &
+                                              b_halo(i+1,j,k+1,2), &
+                                              b_halo(i,j+1,k,2),   &
+                                              b_halo(i+1,j+1,k,2), &
+                                              b_halo(i,j+1,k+1,2), &
+                                              b_halo(i+1,j+1,k+1,2) )
+                pa%b(3)=trilinear_interpolation( x1,y1,z1,            &
+                                                  x2,y2,z2,            &
+                                              pa%x(1),pa%x(2),pa%x(3), &
+                                              b_halo(i,j,k,3),     &
+                                              b_halo(i+1,j,k,3),   &
+                                              b_halo(i,j,k+1,3),   &
+                                              b_halo(i+1,j,k+1,3), &
+                                              b_halo(i,j+1,k,3),   &
+                                              b_halo(i+1,j+1,k,3), &
+                                              b_halo(i,j+1,k+1,3), &
+                                              b_halo(i+1,j+1,k+1,3)) 
+              if(isnan(pa%b(1)) .or. isnan(pa%b(2)) .or. isnan(pa%b(3))) then
+                print*,' !! error in calculating b'
+                print*,'        x1:',x1,y1,z1
+                print*,'        x2:',x2,y2,z2
+                print*,'      pa%x:',pa%x
+                print*,'      rank:',nrank,'i,j,k',i,j,k
+                print*,'  b_halo_x:',b_halo(i:i+1,j:j+1,k:k+1,1)
+                print*,'  b_halo_y:',b_halo(i:i+1,j:j+1,k:k+1,2)
+                print*,'  b_halo_z:',b_halo(i:i+1,j:j+1,k:k+1,3)
+                stop
+              endif
+              !
+              !
+              endif
               !
               exit loopk
               !
@@ -744,9 +858,9 @@ module partack
     !
     part_time=part_time+ptime()-timebeg
     !
-  end subroutine fluid_velo
+  end subroutine field_var
   !+-------------------------------------------------------------------+
-  ! The end of the subroutine fluid_velo                               |
+  ! The end of the subroutine field_var                               |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -813,7 +927,7 @@ module partack
       uyp=linintp(time0,time1,uy0,uy1,particletime)
       uzp=linintp(time0,time1,uz0,uz1,particletime)
       !
-      call particle_velo(uxp,uyp,uzp)
+      call particle_force(uxp,uyp,uzp)
       !
       allocate(xcor(3,numparticle),dxco(3,numparticle,ntime))
       allocate(vcor(3,numparticle),dvco(3,numparticle,ntime))
@@ -917,8 +1031,15 @@ module partack
         !
         npart=npart+1
         !
+        if(isnan(vcor(1,npart)) .or. isnan(vcor(2,npart)) .or. isnan(vcor(3,npart))) then
+          print*, '!! particle velocity NaN @ intt_particel'
+          print*, pa%v(:),pa%f(:)
+          stop
+        endif
+        !
         pa%v(:)=vcor(:,npart)
         pa%x(:)=xcor(:,npart)
+        pa%x(3)=0.d0 ! 2d x-y computation
         !
         pa%dv(:,2:ntime)=dvco(:,npart,2:ntime)
         pa%dx(:,2:ntime)=dxco(:,npart,2:ntime)
@@ -929,7 +1050,7 @@ module partack
       !
       deallocate(xcor,dxco,vcor,dvco)
       !
-      call partical_domain_check('bc_channel')
+      call partical_domain_check('bc_tgv')
       !
       call partical_swap
       !
@@ -1137,7 +1258,103 @@ module partack
         if(pa%x(1)>xlx .or. pa%x(1)<0 .or. &
            pa%x(2)>yly .or. pa%x(2)<0 .or. &
            pa%x(3)>zlz .or. pa%x(3)<0 ) then
-            print*,' !! waring, the particle still moves out of domain'
+            print*,' !! waring, the particle still moves out of domain 1'
+            print*,nrank,jpart,'x:',pa%x(:),'v:',pa%v(:),'vf:',pa%vf(:),'f:',pa%f(:)
+            stop
+        endif
+        !
+        if( pa%x(1)>=lxmin(nrank) .and. pa%x(1)<lxmax(nrank) .and. &
+            pa%x(2)>=lymin(nrank) .and. pa%x(2)<lymax(nrank) .and. &
+            pa%x(3)>=lzmin(nrank) .and. pa%x(3)<lzmax(nrank) ) then
+          continue
+        else
+          !
+          pa%swap=.true.
+          !
+          do jrank=0,nproc-1
+            !
+            ! to find which rank the particle are moving to and 
+            ! mark
+            if(jrank==nrank) cycle
+            !
+            if( pa%x(1)>=lxmin(jrank) .and. pa%x(1)<lxmax(jrank) .and. &
+                pa%x(2)>=lymin(jrank) .and. pa%x(2)<lymax(jrank) .and. &
+                pa%x(3)>=lzmin(jrank) .and. pa%x(3)<lzmax(jrank) ) then
+              !
+              pa%rank2go=jrank
+              !
+              exit
+              !
+            endif
+            !
+          enddo
+          !
+        endif
+        !
+      enddo
+      !
+    elseif(mode=='bc_tgv') then
+      !
+      npart=0
+      npcanc=0
+      do jpart=1,psize
+        !
+        pa=>particle(jpart)
+        !
+        if(pa%new) cycle
+        !
+        npart=npart+1
+        !
+        if(npart>numparticle) exit
+        ! if the particle is out of domain, mark it and subscribe the 
+        ! total number of particles
+        !
+        if(nclx) then
+          !
+          if(pa%x(1)>xlx) then
+            pa%x(1)=pa%x(1)-xlx
+          endif
+          !
+          if(pa%x(1)<0) then
+            pa%x(1)=pa%x(1)+xlx
+          endif
+          !
+        else
+          stop ' 1 @ partical_domain_check'
+        endif
+        !
+        if(ncly) then
+          !
+          if(pa%x(2)>yly) then
+            pa%x(2)=pa%x(2)-yly
+          endif 
+          !
+          if(pa%x(2)<0) then
+            pa%x(2)=pa%x(2)+yly
+          endif
+          !
+        else
+          stop ' 2 @ partical_domain_check'
+        endif
+        !
+        if(nclz) then
+          !
+          if(pa%x(3)>zlz) then
+            pa%x(3)=pa%x(3)-zlz
+          endif 
+          !
+          if(pa%x(3)<0) then
+            pa%x(3)=pa%x(3)+zlz
+          endif
+          !
+        else
+          stop ' 3 @ partical_domain_check'
+        endif
+        !
+        if(pa%x(1)>xlx .or. pa%x(1)<0 .or. &
+           pa%x(2)>yly .or. pa%x(2)<0 .or. &
+           pa%x(3)>zlz .or. pa%x(3)<0 ) then
+            print*,' !! waring, the particle still moves out of domain 2'
             print*,nrank,jpart,'x:',pa%x(:),'v:',pa%v(:),'vf:',pa%vf(:),'f:',pa%f(:)
             stop
         endif
@@ -1710,108 +1927,190 @@ module partack
     if(nrank==0) print*,' ** total number of particles is:',total_num_part
     !
   end subroutine h5write_particle
-  !+-------------------------------------------------------------------+
-  !| This subroutine is used to finalise mpi and stop the program.     |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 19-July-2019: Created by J. Fang @ STFC Daresbury Laboratory      |
-  !+-------------------------------------------------------------------+
-  subroutine mpistop
-    !
-    use mpi
-    !
-    integer :: ierr
-    !
-    call mpi_barrier(mpi_comm_world,ierr)
-    !
-    call mpi_finalize(ierr)
-    !
-    if(nrank==0) print*,' ** The job is done!'
-    !
-    stop
-    !
-  end subroutine mpistop
-  !+-------------------------------------------------------------------+
-  !| The end of the subroutine mpistop.                                |
-  !+-------------------------------------------------------------------+
-  !!
-  function psum_mytype_ary(var) result(varsum)
-    !
-    use mpi
-    use decomp_2d, only : real_type
-    !
-    ! arguments
-    real(mytype),intent(in) :: var(:)
-    real(mytype),allocatable :: varsum(:)
-    !
-    ! local data
-    integer :: ierr,nsize
-    !
-    nsize=size(var)
-    !
-    allocate(varsum(nsize))
-    !
-    call mpi_allreduce(var,varsum,nsize,real_type,mpi_sum,             &
-                                                    mpi_comm_world,ierr)
-    !
-    return
-    !
-  end function psum_mytype_ary
   !
-  function psum_integer(var,comm) result(varsum)
+  subroutine pswap_yz(varin,varout)
     !
+    use variables, only : p_row, p_col
+    use decomp_2d, only : xsize
+    use param,     only : nclx,ncly,nclz
     use mpi
-    use decomp_2d, only : real_type
     !
     ! arguments
-    integer,intent(in) :: var
-    integer,optional,intent(in) :: comm
-    integer :: varsum
+    real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(in) :: varin
+    real(mytype),intent(out) :: varout(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1)
     !
     ! local data
-    integer :: ierr,comm2use
+    integer :: i,j,k,n,jrk,krk,ncou,mpitag,ierr
+    integer :: status(mpi_status_size) 
+    integer,allocatable,save :: mrank(:,:)
+    integer,save :: upper,lower,front,bback
+    logical,save :: init=.true.
+    real(mytype),dimension(:,:),allocatable :: sbuf1,sbuf2,rbuf1,rbuf2
     !
-    if(present(comm)) then
-        comm2use=comm
-    else
-        comm2use=mpi_comm_world
+    if(init) then
+      !
+      allocate(mrank(p_row,p_col))
+      !
+      n=-1
+      do j=1,p_row
+      do k=1,p_col
+        !
+        n=n+1
+        mrank(j,k)=n
+        !
+        if(nrank==n) then
+          jrk=j
+          krk=k
+        endif
+        !
+      enddo
+      enddo
+      !
+      if(jrk==1) then
+        upper=mrank(jrk+1,krk)
+        !
+        if(ncly) then
+          lower=mrank(p_row,krk)
+        else
+          lower=mpi_proc_null
+        endif
+        !
+      elseif(jrk==p_row) then
+        !
+        if(ncly) then
+          upper=mrank(1,krk)
+        else
+          upper=mpi_proc_null
+        endif
+        !
+        lower=mrank(jrk-1,krk)
+      else
+        upper=mrank(jrk+1,krk)
+        lower=mrank(jrk-1,krk)
+      endif
+      !
+      if(p_col==1) then
+        front=mpi_proc_null
+        bback=mpi_proc_null
+      else
+        !
+        if(krk==1) then
+          front=mrank(jrk,krk+1)
+          !
+          if(nclz) then
+            bback=mrank(jrk,p_col)
+          else
+            bback=mpi_proc_null
+          endif
+          !
+        elseif(krk==p_col) then
+          if(nclz) then
+            front=mrank(jrk,1)
+          else
+            front=mpi_proc_null
+          endif
+          !
+          bback=mrank(jrk,krk-1)
+        else
+          front=mrank(jrk,krk+1)
+          bback=mrank(jrk,krk-1)
+        endif
+      endif
+      !
+      ! print*,p_row,p_col
+      ! print*,nrank,'-',jrk,krk,':',upper,lower,front,bback,mpi_proc_null
+      !
+      init=.false.
+      !
     endif
     !
+    varout(1:xsize(1),1:xsize(2),1:xsize(3))=varin(1:xsize(1),1:xsize(2),1:xsize(3))
     !
-    call mpi_allreduce(var,varsum,1,mpi_integer,mpi_sum,           &
-                                                    comm2use,ierr)
+    mpitag=1000
     !
-    return
+    ! send & recv in the z direction
     !
-  end function psum_integer
-  !
-  function psum_mytype(var,comm) result(varsum)
-    !
-    use mpi
-    use decomp_2d, only : real_type
-    !
-    ! arguments
-    real(mytype),intent(in) :: var
-    integer,optional,intent(in) :: comm
-    real(mytype) :: varsum
-    !
-    ! local data
-    integer :: ierr,comm2use
-    !
-    if(present(comm)) then
-        comm2use=comm
+    if(xsize(3)==1) then
+      varout(1:xsize(1),1:xsize(2),0)=varout(1:xsize(1),1:xsize(2),1)
+      varout(1:xsize(1),1:xsize(2),2)=varout(1:xsize(1),1:xsize(2),1)
     else
-        comm2use=mpi_comm_world
+      !
+      allocate(sbuf1(1:xsize(1),1:xsize(2)),sbuf2(1:xsize(1),1:xsize(2)),&
+               rbuf1(1:xsize(1),1:xsize(2)),rbuf2(1:xsize(1),1:xsize(2)))
+      !
+      if(front .ne. mpi_proc_null) then
+        sbuf1(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),xsize(3))
+      endif
+      if(bback .ne. mpi_proc_null) then
+        sbuf2(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),1)
+      endif
+      !
+      ncou=xsize(1)*xsize(2)
+      !
+      ! Message passing
+      call mpi_sendrecv(sbuf1,ncou,mpi_real8,front, mpitag,             &
+                        rbuf1,ncou,mpi_real8,bback, mpitag,             &
+                                               mpi_comm_world,status,ierr)
+      mpitag=mpitag+1
+      call mpi_sendrecv(sbuf2,ncou,mpi_real8,bback, mpitag,            &
+                        rbuf2,ncou,mpi_real8,front, mpitag,            &
+                                               mpi_comm_world,status,ierr)
+      !
+      if(bback .ne. mpi_proc_null) then
+        varout(1:xsize(1),1:xsize(2),0)=rbuf1(1:xsize(1),1:xsize(2))
+      endif
+      if(front .ne. mpi_proc_null) then
+        varout(1:xsize(1),1:xsize(2),xsize(3)+1)=rbuf2(1:xsize(1),1:xsize(2))
+      endif
+      !
+      deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
+      !
     endif
     !
+    ! end of Message passing in the z direction
     !
-    call mpi_allreduce(var,varsum,1,real_type,mpi_sum,           &
-                                                    comm2use,ierr)
+    ! 
+    ! send & recv in the y direction
+    allocate( sbuf1(1:xsize(1),0:xsize(3)+1),                          &
+              sbuf2(1:xsize(1),0:xsize(3)+1),                          &
+              rbuf1(1:xsize(1),0:xsize(3)+1),                          &
+              rbuf2(1:xsize(1),0:xsize(3)+1) )
+
+    if(upper .ne. mpi_proc_null) then
+      sbuf1(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),xsize(2),0:xsize(3)+1)
+    endif
+    if(lower .ne. mpi_proc_null) then
+      sbuf2(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),1,0:xsize(3)+1)
+    endif
+    !
+    ncou=xsize(1)*(xsize(3)+2)
+    !
+    ! Message passing
+    call mpi_sendrecv(sbuf1,ncou,mpi_real8,upper, mpitag,             &
+                      rbuf1,ncou,mpi_real8,lower, mpitag,             &
+                                             mpi_comm_world,status,ierr)
+    mpitag=mpitag+1
+    call mpi_sendrecv(sbuf2,ncou,mpi_real8,lower, mpitag,            &
+                      rbuf2,ncou,mpi_real8,upper, mpitag,            &
+                                             mpi_comm_world,status,ierr)
+    !
+    if(upper .ne. mpi_proc_null) then
+      varout(1:xsize(1),xsize(2)+1,0:xsize(3)+1)=rbuf2(1:xsize(1),0:xsize(3)+1)
+    endif
+    if(lower .ne. mpi_proc_null) then
+      varout(1:xsize(1),0,0:xsize(3)+1)=rbuf1(1:xsize(1),0:xsize(3)+1)
+    endif
+    !
+    deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
+    ! send & recv in the y direction
+    !
+    if(nclx) then
+      varout(xsize(1)+1,:,:)=varout(1,:,:)
+    endif
     !
     return
     !
-  end function psum_mytype
+  end subroutine pswap_yz
   !
   !+-------------------------------------------------------------------+
   !| this subroutine clean superfluous elements in a array             |
@@ -1880,7 +2179,7 @@ module partack
   !+-------------------------------------------------------------------+
   !| The end of the subroutine mclean.                                 |
   !+-------------------------------------------------------------------+
-  !!
+  !
   !+-------------------------------------------------------------------+
   !| this function is to retune the size of a array                    |
   !+-------------------------------------------------------------------+
@@ -1919,95 +2218,6 @@ module partack
   end function size_integer
   !+-------------------------------------------------------------------+
   !| The end of the subroutine size_particle.                          |
-  !+-------------------------------------------------------------------+
-  !
-  !+-------------------------------------------------------------------+
-  !| this function is to update table based on alltoall mpi            |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 17-Jun-2022  | Created by J. Fang STFC Daresbury Laboratory       |
-  !+-------------------------------------------------------------------+
-  function ptable_update_int_arr(vain) result(vout)
-    !
-    use mpi
-    !
-    integer,intent(in) :: vain(:)
-    integer :: vout(size(vain))
-    !
-    ! local variables
-    integer :: nvar,ierr
-    !
-    nvar=size(vain)
-    !
-    call mpi_alltoall(vain,1,mpi_integer,                   &
-                      vout,1,mpi_integer,mpi_comm_world,ierr)
-    !
-    return
-    !
-  end function ptable_update_int_arr
-  !
-  function updatable_int(var,offset,debug,comm,comm_size) result(table)
-    !
-    use mpi
-    !
-    ! arguments
-    integer,allocatable :: table(:)
-    integer,intent(in) :: var
-    integer,optional,intent(out) :: offset
-    logical,intent(in),optional :: debug
-    integer,intent(in),optional :: comm,comm_size
-    !
-    ! local data
-    integer :: comm2use,comm2size
-    integer :: ierr,i
-    integer,allocatable :: vta(:)
-    logical :: ldebug
-    !
-    if(present(debug)) then
-      ldebug=debug
-    else
-      ldebug=.false.
-    endif
-    !
-    if(present(comm)) then
-        comm2use=comm
-    else
-        comm2use=mpi_comm_world
-    endif
-    !
-    if(present(comm_size)) then
-        comm2size=comm_size
-    else
-        comm2size=nproc
-    endif
-    !
-    allocate(table(0:comm2size-1),vta(0:comm2size-1))
-    !
-    call mpi_allgather(var,1,mpi_integer,                              &
-                       vta,1,mpi_integer,comm2use,ierr)
-    !
-    table=vta
-    !
-    if(present(offset)) then
-      !
-      if(nrank==0) then
-        offset=0
-      else
-        !
-        offset=0
-        do i=0,nrank-1
-          offset=offset+vta(i)
-        enddo
-        !
-      endif
-      !
-    endif
-    !
-  end function updatable_int
-  !
-  !+-------------------------------------------------------------------+
-  !| The end of the subroutine ptable_update_int_arr.                  |
   !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
@@ -2147,760 +2357,6 @@ module partack
   !| The end of the subroutine pa2a_particle.                          |
   !+-------------------------------------------------------------------+
   !
-  !+-------------------------------------------------------------------+
-  !| The wraper of MPI_Wtime                                           |
-  !+-------------------------f------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 28-November-2019: Created by J. Fang @ STFC Daresbury Laboratory  |
-  !+-------------------------------------------------------------------+
-  real(mytype) function ptime()
-    !
-    use mpi
-    !
-    ptime=MPI_Wtime()
-    !
-    return
-    !
-  end function ptime
-  !+-------------------------------------------------------------------+
-  !| The end of the function ptime.                                    |
-  !+-------------------------------------------------------------------+
-  !
-  !+-------------------------------------------------------------------+
-  !| This subroutine is used to open the h5file interface and assign   |
-  !| h5file_id. For write each new file, this will be called first, but|
-  !| once it is called, the file will be overwriten.                   |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 03-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
-  !+-------------------------------------------------------------------+
-  subroutine h5io_init(filename,mode,comm)
-    !
-    use mpi, only: mpi_comm_world,mpi_info_null
-    !
-    ! arguments
-    character(len=*),intent(in) :: filename
-    character(len=*),intent(in) :: mode
-    integer,intent(in),optional :: comm
-    ! h5file_id is returned
-    !
-    ! local data
-    integer :: h5error,comm2use
-    integer(hid_t) :: plist_id
-    !
-    if(present(comm)) then
-        comm2use=comm
-    else
-        comm2use=mpi_comm_world
-    endif
-    !
-    call h5open_f(h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_init call h5open_f'
-    !
-    ! create access property list and set mpi i/o
-    call h5pcreate_f(h5p_file_access_f,plist_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pcreate_f'
-    !
-    call h5pset_fapl_mpio_f(plist_id,comm2use,mpi_info_null,     &
-                                                                h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pset_fapl_mpio_f'
-    !
-    if(mode=='writ') then
-      call h5fcreate_f(filename,h5f_acc_trunc_f,h5file_id,             &
-                                            h5error,access_prp=plist_id)
-      if(h5error.ne.0)  stop ' !! error in h5io_init call h5fcreate_f'
-    elseif(mode=='read') then
-      call h5fopen_f(filename,h5f_acc_rdwr_f,h5file_id,                &
-                                            h5error,access_prp=plist_id)
-      if(h5error.ne.0)  stop ' !! error in h5io_init call h5fopen_f'
-    else
-        stop ' !! mode not defined @ h5io_init'
-    endif
-    !
-    call h5pclose_f(plist_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_init call h5pclose_f'
-    !
-    if(nrank==0) print*,' ** open h5 file: ',filename
-    !
-  end subroutine h5io_init
-  !+-------------------------------------------------------------------+
-  !| This end of the subroutine h5io_init.                             |
-  !+-------------------------------------------------------------------+
-  !
-  !+-------------------------------------------------------------------+
-  !| This subroutine is used to close hdf5 interface after finish      |
-  !| input/output a hdf5 file.                                         |
-  !| the only data needed is h5file_id                                 |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 03-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
-  !+-------------------------------------------------------------------+
-  subroutine h5io_end
-    !
-    ! local data
-    integer :: h5error
-    !
-    call h5fclose_f(h5file_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_end call h5fclose_f'
-    !
-    call h5close_f(h5error)
-    if(h5error.ne.0)  stop ' !! error in h5io_end call h5close_f'
-    !
-  end subroutine h5io_end
-  !+-------------------------------------------------------------------+
-  !| This end of the subroutine h5io_end.                              |
-  !+-------------------------------------------------------------------+
-  !
-  !+-------------------------------------------------------------------+
-  !| This subroutine is used to write a 1D array with hdf5 interface.  |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 02-Jun-2020 | Created by J. Fang STFC Daresbury Laboratory        |
-  !+-------------------------------------------------------------------+
-  subroutine h5wa_r8(varname,var,total_size,comm,comm_size,comm_rank)
-    !
-    use decomp_2d, only : mytype
-    use mpi, only: mpi_comm_world,mpi_info_null
-    ! use parallel,only: nrank,mpistop,psum,ptabupd,nrankmax
-    !
-    ! arguments
-    character(LEN=*),intent(in) :: varname
-    real(mytype),intent(in),allocatable :: var(:)
-    integer,intent(in) :: total_size
-    integer,intent(in),optional :: comm,comm_size,comm_rank
-    !
-    ! local data
-    integer :: jrk
-    integer :: dim,dima,rank2use,comm2use,comm2size
-    integer,allocatable :: dim_table(:)
-    integer(hsize_t), dimension(1) :: offset
-    integer :: h5error
-    !
-    integer(hid_t) :: dset_id,filespace,memspace,plist_id
-    integer(hsize_t) :: dimt(1),dimat(1)
-    !
-    if(allocated(var)) then
-      dim=size(var)
-    else
-      dim=0
-    endif
-    !
-    if(present(comm)) then
-        comm2use=comm
-    else
-        comm2use=mpi_comm_world
-    endif
-    !
-    if(present(comm_size)) then
-        comm2size=comm_size
-    else
-        comm2size=nproc
-    endif
-    !
-    if(present(comm_rank)) then
-        rank2use=comm_rank
-    else
-        rank2use=nrank
-    endif
-    !
-    allocate(dim_table(0:comm2size-1))
-    ! dima=psum(dim,comm=comm2use)
-    !
-    dimt=(/dim/)
-    dimat=(/total_size/)
-    !
-    dim_table=ptabupd(dim,comm=comm2use,comm_size=comm2size)
-    !
-    offset=0
-    do jrk=0,rank2use-1
-      offset=offset+dim_table(jrk)
-    enddo
-    !
-    ! print*,mpi_rank_part,nrank,'|',dim,offset
-    !
-    ! writing the data
-    !
-    call h5screate_simple_f(1,dimat,filespace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5screate_simple_f'
-    call h5dcreate_f(h5file_id,varname,h5t_native_double,filespace,    &
-                                                       dset_id,h5error)
-
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dcreate_f'
-    call h5screate_simple_f(1,dimt,memspace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5screate_simple_f'
-    call h5sclose_f(filespace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
-    call h5dget_space_f(dset_id,filespace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dget_space_f'
-    call h5sselect_hyperslab_f(filespace,h5s_select_set_f,offset,      &
-                                                          dimt,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sselect_hyperslab_f'
-    call h5pcreate_f(h5p_dataset_xfer_f,plist_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pcreate_f'
-    call h5pset_dxpl_mpio_f(plist_id,h5fd_mpio_collective_f,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pset_dxpl_mpio_f'
-    call h5dwrite_f(dset_id,h5t_native_double,var,dimt,h5error,        &
-                    file_space_id=filespace,mem_space_id=memspace,     &
-                                                     xfer_prp=plist_id)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dwrite_f'
-    call h5sclose_f(filespace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
-    call h5sclose_f(memspace,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5sclose_f'
-    call h5dclose_f(dset_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5dclose_f'
-    call h5pclose_f(plist_id,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5wa_r8 call h5pclose_f'
-    !
-    if(mpi_rank_part==0) print*,' << ',varname
-    !
-  end subroutine h5wa_r8
-  !
-  subroutine h5w_int4(varname,var)
-    !
-    use mpi, only: mpi_info_null
-    !
-    ! arguments
-    character(LEN=*),intent(in) :: varname
-    integer,intent(in) :: var
-    !
-    ! local data
-    integer :: nvar(1)
-    integer :: h5error
-    integer(hsize_t) :: dimt(1)=(/1/)
-    !
-    ! writing the data
-    !
-    nvar=var
-    call h5ltmake_dataset_f(h5file_id,varname,1,dimt,                  &
-                                        h5t_native_integer,nvar,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5w_int4 call h5ltmake_dataset_f'
-    !
-    if(nrank==0) print*,' << ',varname
-    !
-  end subroutine h5w_int4
-  !
-  subroutine h5w_real8(varname,var)
-    !
-    use mpi, only: mpi_info_null
-    !
-    ! arguments
-    character(LEN=*),intent(in) :: varname
-    real(mytype),intent(in) :: var
-    !
-    ! local data
-    real(mytype) :: rvar(1)
-    integer :: h5error
-    integer(hsize_t) :: dimt(1)=(/1/)
-    !
-    rvar=var
-    call h5ltmake_dataset_f(h5file_id,varname,1,dimt,                  &
-                                        h5t_native_double,rvar,h5error)
-    if(h5error.ne.0)  stop ' !! error in h5w_real8 call h5ltmake_dataset_f'
-    !
-    if(nrank==0) print*,' << ',varname
-    !
-  end subroutine h5w_real8
-  !
-  !+-------------------------------------------------------------------+
-  !| This subroutine is to create a sub-communicator from nranks.    |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 12-08-2022: Created by J. Fang @ STFC Daresbury Laboratory        |
-  !+-------------------------------------------------------------------+
-  subroutine subcomm_group(rank,communicator,newrank,newsize)
-    !
-    use mpi
-    ! arguments
-    integer,intent(in) :: rank
-    integer,intent(out) :: communicator,newrank,newsize
-    !
-    ! local data
-    integer :: group_mpi,mpi_group_world
-    integer :: ierr,ncout,jrank
-    integer,allocatable :: rank_use(:),ranktemp(:)
-    !
-    allocate(ranktemp(0:nproc-1))
-    !
-    call pgather(rank,ranktemp)
-    !
-    ncout=0
-    do jrank=0,nproc-1
-      !
-      if(ranktemp(jrank)>=0) then
-        ncout=ncout+1
-      endif
-      !
-    enddo
-    !
-    allocate(rank_use(1:ncout))
-    !
-    ncout=0
-    do jrank=0,nproc-1
-      !
-      if(ranktemp(jrank)>=0) then
-        ncout=ncout+1
-        !
-        rank_use(ncout)=ranktemp(jrank)
-        !
-      endif
-      !
-    enddo
-    !
-    call mpi_comm_group(mpi_comm_world,mpi_group_world,ierr)
-    call mpi_group_incl(mpi_group_world,size(rank_use),rank_use,group_mpi,ierr)
-    call mpi_comm_create(mpi_comm_world,group_mpi,communicator,ierr)
-    !
-    if(any(rank_use==nrank)) then
-      call mpi_comm_size(communicator,newsize,ierr)
-      call mpi_comm_rank(communicator,newrank,ierr)
-      if(newrank==0) print*,' ** new subcomm created, size: ',newsize
-      ! print*,' ** local rank:',newrank,', gloable rank:',nrank
-    else
-      newrank=-1
-      newsize=0
-    endif
-    !
-  end subroutine subcomm_group
-  !+-------------------------------------------------------------------+
-  !| The end of the subroutine subcomm_group.                          |
-  !+-------------------------------------------------------------------+
-  !
-  subroutine pgather_int(var,data,mode)
-    !
-    use mpi
-    !
-    ! arguments
-    integer,intent(in) :: var
-    integer,intent(out),allocatable :: data(:)
-    character(len=*),intent(in),optional :: mode
-    !
-    !
-    ! local data
-    integer :: counts(0:nproc-1)
-    integer :: ierr,jrank,ncou
-    !
-    call mpi_allgather(var, 1, mpi_integer, counts, 1, mpi_integer,  &
-                       mpi_comm_world, ierr)
-    !
-    if(present(mode) .and. mode=='noneg') then
-      ! only pick >=0 values
-      ncou=0
-      do jrank=0,nproc-1
-        if(counts(jrank)>=0) then
-          ncou=ncou+1
-        endif
-      enddo
-      !
-      allocate(data(ncou))
-      ncou=0
-      do jrank=0,nproc-1
-        if(counts(jrank)>=0) then
-          ncou=ncou+1
-          data(ncou)=counts(jrank)
-        endif
-      enddo
-      !
-    else
-      allocate(data(0:nproc-1))
-      data=counts
-    endif
-    !
-  end subroutine pgather_int
-  !
-  integer function  pmax_int(var)
-    !
-    use mpi
-    !
-    ! arguments
-    integer,intent(in) :: var
-    !
-    ! local data
-    integer :: ierr
-    !
-    call mpi_allreduce(var,pmax_int,1,mpi_integer,mpi_max,             &
-                                                    mpi_comm_world,ierr)
-    !
-  end function pmax_int
-  !
-  real(mytype) function  pmax_mytype(var)
-    !
-    use mpi
-    use decomp_2d, only : real_type
-    !
-    ! arguments
-    real(mytype),intent(in) :: var
-    !
-    ! local data
-    integer :: ierr
-    !
-    call mpi_allreduce(var,pmax_mytype,1,real_type,mpi_max,             &
-                                                    mpi_comm_world,ierr)
-    !
-  end function pmax_mytype
-  !
-  subroutine pswap_yz(varin,varout)
-    !
-    use variables, only : p_row, p_col
-    use decomp_2d, only : xsize
-    use param,     only : nclx,ncly,nclz
-    use mpi
-    !
-    ! arguments
-    real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(in) :: varin
-    real(mytype),allocatable,intent(out) :: varout(:,:,:)
-    !
-    ! local data
-    integer :: i,j,k,n,jrk,krk,ncou,mpitag,ierr
-    integer :: status(mpi_status_size) 
-    integer,allocatable,save :: mrank(:,:)
-    integer,save :: upper,lower,front,bback
-    logical,save :: init=.true.
-    real(mytype),dimension(:,:),allocatable :: sbuf1,sbuf2,rbuf1,rbuf2
-    !
-    if(init) then
-      !
-      allocate(mrank(p_row,p_col))
-      !
-      n=-1
-      do j=1,p_row
-      do k=1,p_col
-        !
-        n=n+1
-        mrank(j,k)=n
-        !
-        if(nrank==n) then
-          jrk=j
-          krk=k
-        endif
-        !
-      enddo
-      enddo
-      !
-      if(jrk==1) then
-        upper=mrank(jrk+1,krk)
-        !
-        if(ncly) then
-          lower=mrank(p_row,krk)
-        else
-          lower=mpi_proc_null
-        endif
-        !
-      elseif(jrk==p_row) then
-        !
-        if(ncly) then
-          upper=mrank(1,krk)
-        else
-          upper=mpi_proc_null
-        endif
-        !
-        lower=mrank(jrk-1,krk)
-      else
-        upper=mrank(jrk+1,krk)
-        lower=mrank(jrk-1,krk)
-      endif
-      !
-      if(krk==1) then
-        front=mrank(jrk,krk+1)
-        !
-        if(nclz) then
-          bback=mrank(jrk,p_col)
-        else
-          bback=mpi_proc_null
-        endif
-        !
-      elseif(krk==p_col) then
-        if(nclz) then
-          front=mrank(jrk,1)
-        else
-          front=mpi_proc_null
-        endif
-        !
-        bback=mrank(jrk,krk-1)
-      else
-        front=mrank(jrk,krk+1)
-        bback=mrank(jrk,krk-1)
-      endif
-      !
-      ! print*,nrank,'-',jrk,krk,':',upper,lower,front,bback,mpi_proc_null
-      !
-      init=.false.
-      !
-    endif
-    !
-    allocate(varout(1:xsize(1)+1,0:xsize(2)+1,0:xsize(3)+1))
-    !
-    varout(1:xsize(1),1:xsize(2),1:xsize(3))=varin(1:xsize(1),1:xsize(2),1:xsize(3))
-    !
-    mpitag=1000
-    !
-    ! send & recv in the z direction
-    allocate(sbuf1(1:xsize(1),1:xsize(2)),sbuf2(1:xsize(1),1:xsize(2)),&
-             rbuf1(1:xsize(1),1:xsize(2)),rbuf2(1:xsize(1),1:xsize(2)))
-    !
-    if(front .ne. mpi_proc_null) then
-      sbuf1(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),xsize(3))
-    endif
-    if(bback .ne. mpi_proc_null) then
-      sbuf2(1:xsize(1),1:xsize(2))=varout(1:xsize(1),1:xsize(2),1)
-    endif
-    !
-    ncou=xsize(1)*xsize(2)
-    !
-    ! Message passing
-    call mpi_sendrecv(sbuf1,ncou,mpi_real8,front, mpitag,             &
-                      rbuf1,ncou,mpi_real8,bback, mpitag,             &
-                                             mpi_comm_world,status,ierr)
-    mpitag=mpitag+1
-    call mpi_sendrecv(sbuf2,ncou,mpi_real8,bback, mpitag,            &
-                      rbuf2,ncou,mpi_real8,front, mpitag,            &
-                                             mpi_comm_world,status,ierr)
-    !
-    if(bback .ne. mpi_proc_null) then
-      varout(1:xsize(1),1:xsize(2),0)=rbuf1(1:xsize(1),1:xsize(2))
-    endif
-    if(front .ne. mpi_proc_null) then
-      varout(1:xsize(1),1:xsize(2),xsize(3)+1)=rbuf2(1:xsize(1),1:xsize(2))
-    endif
-    !
-    deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
-    !
-    ! end of Message passing in the z direction
-    !
-    ! 
-    ! send & recv in the y direction
-    allocate( sbuf1(1:xsize(1),0:xsize(3)+1),                          &
-              sbuf2(1:xsize(1),0:xsize(3)+1),                          &
-              rbuf1(1:xsize(1),0:xsize(3)+1),                          &
-              rbuf2(1:xsize(1),0:xsize(3)+1) )
-
-    if(upper .ne. mpi_proc_null) then
-      sbuf1(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),xsize(2),0:xsize(3)+1)
-    endif
-    if(lower .ne. mpi_proc_null) then
-      sbuf2(1:xsize(1),0:xsize(3)+1)=varout(1:xsize(1),1,0:xsize(3)+1)
-    endif
-    !
-    ncou=xsize(1)*(xsize(3)+2)
-    !
-    ! Message passing
-    call mpi_sendrecv(sbuf1,ncou,mpi_real8,upper, mpitag,             &
-                      rbuf1,ncou,mpi_real8,lower, mpitag,             &
-                                             mpi_comm_world,status,ierr)
-    mpitag=mpitag+1
-    call mpi_sendrecv(sbuf2,ncou,mpi_real8,lower, mpitag,            &
-                      rbuf2,ncou,mpi_real8,upper, mpitag,            &
-                                             mpi_comm_world,status,ierr)
-    !
-    if(upper .ne. mpi_proc_null) then
-      varout(1:xsize(1),xsize(2)+1,0:xsize(3)+1)=rbuf2(1:xsize(1),0:xsize(3)+1)
-    endif
-    if(lower .ne. mpi_proc_null) then
-      varout(1:xsize(1),0,0:xsize(3)+1)=rbuf1(1:xsize(1),0:xsize(3)+1)
-    endif
-    !
-    deallocate(sbuf1,sbuf2,rbuf1,rbuf2)
-    ! send & recv in the y direction
-    !
-    if(nclx) then
-      varout(xsize(1)+1,:,:)=varout(1,:,:)
-    endif
-    !
-    return
-    !
-  end subroutine pswap_yz
-  !
-  !+-------------------------------------------------------------------+
-  !| This subroutine is used to read 1-D array via hdf5 interface.     |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 31-03-2022  | Created by J. Fang @ Warrington                     |
-  !+-------------------------------------------------------------------+
-  subroutine h5_readarray1d(varname,var,dim,filename,explicit)
-    !
-    !
-    real(mytype),intent(out) :: var(:)
-    integer,intent(in) :: dim
-    character(len=*),intent(in) :: varname,filename
-    logical,intent(in), optional:: explicit
-    logical :: lexplicit
-    !
-    integer(hid_t) :: file_id
-    ! file identifier
-    integer(hid_t) :: dset_id1
-    ! dataset identifier
-    integer :: h5error ! error flag
-    integer(hsize_t) :: dimt(1)
-    !
-    if (present(explicit)) then
-       lexplicit = explicit
-    else
-       lexplicit = .true.
-    end if
-    !
-    call h5open_f(h5error)
-    !
-    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
-
-    ! open an existing dataset.
-    call h5dopen_f(file_id,varname,dset_id1,h5error)
-    !
-    dimt=(/dim/)
-    !
-    ! read the dataset.
-    call h5dread_f(dset_id1,h5t_native_double,var,dimt,h5error)
-
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 1'
-    !
-    ! close the dataset
-    call h5dclose_f(dset_id1, h5error)
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 2'
-    ! close the file.
-    call h5fclose_f(file_id, h5error)
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 3'
-    !
-    ! close fortran interface.
-    call h5close_f(h5error)
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1d 4'
-    !
-    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
-    !
-  end subroutine h5_readarray1d
-  !
-  subroutine h5_read1int(var,varname,filename,explicit)
-    !
-    integer,intent(out) :: var
-    character(len=*),intent(in) :: varname,filename
-    logical,intent(in), optional:: explicit
-    logical :: lexplicit
-    !
-    integer(hid_t) :: file_id
-    ! file identifier
-    integer(hid_t) :: dset_id1
-    ! dataset identifier
-    integer :: v(1)
-    integer :: h5error ! error flag
-    integer(hsize_t) :: dimt(1)
-    !
-    if (present(explicit)) then
-       lexplicit = explicit
-    else
-       lexplicit = .true.
-    end if
-    !
-    dimt=(/1/)
-    !
-    call h5open_f(h5error)
-    print*,' ** open hdf5 interface'
-    !
-    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
-    !
-    call h5ltread_dataset_f(file_id,varname,h5t_native_integer,v,dimt,h5error)
-    !
-    call h5fclose_f(file_id,h5error)
-    !
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 1'
-    !
-    ! close fortran interface.
-    call h5close_f(h5error)
-    !
-    var=v(1)
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 2'
-    !
-    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
-    !
-  end subroutine h5_read1int
-  !
-  subroutine h5_read1rl8(var,varname,filename,explicit)
-    !
-    real(mytype),intent(out) :: var
-    character(len=*),intent(in) :: varname,filename
-    logical,intent(in), optional:: explicit
-    logical :: lexplicit
-    !
-    integer(hid_t) :: file_id
-    ! file identifier
-    integer(hid_t) :: dset_id1
-    ! dataset identifier
-    real(mytype) :: v(1)
-    integer :: h5error ! error flag
-    integer(hsize_t) :: dimt(1)
-    !
-    if (present(explicit)) then
-       lexplicit = explicit
-    else
-       lexplicit = .true.
-    end if
-    !
-    dimt=(/1/)
-    !
-    call h5open_f(h5error)
-    if(lexplicit)  print*,' ** open hdf5 interface'
-    !
-    call h5fopen_f(filename,h5f_acc_rdwr_f,file_id,h5error)
-    !
-    call h5ltread_dataset_f(file_id,varname,h5t_native_double,v,dimt,h5error)
-    !
-    call h5fclose_f(file_id,h5error)
-    !
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 1'
-    !
-    ! close fortran interface.
-    call h5close_f(h5error)
-    !
-    var=v(1)
-    if(h5error.ne.0)  stop ' !! error in h5_readarray1dint 2'
-    !
-    if(lexplicit)  print*,' >> ',varname,' from ',filename,' ... done'
-    !
-    !
-  end subroutine h5_read1rl8
-  !+-------------------------------------------------------------------+
-  !| This end of the subroutine h5_readarray1d.                        |
-  !+-------------------------------------------------------------------+
-  !!
-  !+-------------------------------------------------------------------+
-  !| This function is used to get the dimension of the hdf5 array.     |
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 30-JuL-2020 | Coped from ASTR Post by J. Fang STFC Daresbury Lab. |
-  !+-------------------------------------------------------------------+
-  function h5getdim3d(varname,filenma) result(dims)
-    !
-    character(len=*),intent(in) :: varname,filenma
-    integer :: dims
-    !
-    ! local data
-    integer(hid_t)  :: file, space, dset
-    integer(hsize_t) :: ndims(1)
-    integer         :: h5error ! error flag
-    integer(hsize_t) :: dims_h5(1)
-    !
-    !
-    call h5open_f(h5error)
-    call h5fopen_f(filenma,h5f_acc_rdonly_f,file,h5error)
-    call h5dopen_f (file,varname,dset, h5error)
-    call h5dget_space_f(dset, space, h5error)
-    call h5sget_simple_extent_dims_f(space,dims_h5,ndims,h5error)
-    !
-    dims=dims_h5(1)
-    !
-    call h5dclose_f(dset , h5error)
-    call h5sclose_f(space, h5error)
-    call h5fclose_f(file , h5error)
-    call h5close_f(h5error)
-    !
-  end function h5getdim3d
-  !+-------------------------------------------------------------------+
-  !| This end of the function h5getdim3d.                              |
-  !+-------------------------------------------------------------------+
 end module partack
 !+---------------------------------------------------------------------+
 ! The end of the module partack                                        |

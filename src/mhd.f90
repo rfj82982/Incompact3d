@@ -11,7 +11,7 @@ module mhd
   use decomp_2d, only : mytype,xsize,nrank,nproc
   use hdf5
   use h5lt
-  use partack, only: mpistop,rankname
+  use mptool, only: mpistop,rankname,psum,pmax,cross_product
   !
   implicit none
   !
@@ -376,7 +376,7 @@ module mhd
     enddo
     enddo
     !
-    rhs=divergence_sclar(ucB,nlock)
+    rhs=divergence_scalar(ucB,nlock)
     !
     converged=.false.
     !
@@ -399,7 +399,7 @@ module mhd
     enddo
     enddo
     !
-    ! div3=divergence_sclar(Je,nlock)
+    ! div3=divergence_scalar(Je,nlock)
     ! !
     ! call div_check(div3)
     !
@@ -435,7 +435,6 @@ module mhd
     !
     use decomp_2d, only : mytype, xsize, zsize, ph1, nrank
     use var,       only : nzmsize,itime,ilist,ifirst,ilast,numscalar, dv3
-    use partack,   only : mpistop
     use navier, only : divergence
     use param, only : ntime,nrhotime
     !
@@ -456,18 +455,10 @@ module mhd
     !
     if ((mod(itime,ilist)==0 .or. itime == ifirst .or. itime == ilast)) then
       !
-      ! div3=divergence_sclar(Bm,nlock)
       call divergence(div3,rho1,Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),ep1,drho1,divu3,2,identifier='B')
       !
-      ! call div_check(div3,maxb,meanb)
-      !
-      ! if (nrank == 0) then
-      !    write(*,*) 'DIV B max mean=',real(maxb,mytype),real(meanb/real(nproc),mytype)
-      ! endif
       !
     endif
-    !
-    ! call mpistop
     !
   end subroutine test_magnetic
   !
@@ -482,7 +473,6 @@ module mhd
     use var, only : sgsx1,sgsy1,sgsz1
     use var, only : FTx, FTy, FTz, Fdiscx, Fdiscy, Fdiscz
     use ibm_param, only : ubcx,ubcy,ubcz
-    use les, only : compute_SGS
     use mpi
 
     implicit none
@@ -786,19 +776,19 @@ module mhd
     use navier,only : gradp
 
     real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: phib
-    
-    real(mytype),dimension(ph1%zst(1):ph1%zen(1),ph1%zst(2):ph1%zen(2),nzmsize) :: div3
 
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),1:3) :: dphib
 
-    integer :: i,j,k,nlock
+    integer :: i,j,k,nlock,poissiter
     logical :: converged
     !
-    nlock=1
+    nlock=1 !! Corresponds to computing div(u*)
     !
-    phib=divergence_sclar(Bm,nlock)
+    phib=divergence_scalar(Bm,nlock)
     !
     converged=.false.
+    !
+    poissiter = 0
     !
     do while(.not.converged)
       !
@@ -808,87 +798,90 @@ module mhd
       !
       converged=.true.
       !
+      poissiter = poissiter + 1
+      !
     enddo
     !
     Bm=Bm-dphib
     !
+    sync_Bm_needed=.true.
+    !
   end subroutine solve_poisson_mhd
   !
-  subroutine solve_poisson_mhd2(rho1, ep1, drho1, divu3)
+  ! subroutine solve_poisson_mhd2(rho1, ep1, drho1, divu3)
 
-    USE decomp_2d, ONLY : mytype, xsize, zsize, ph1, nrank, real_type
-    USE decomp_2d_poisson, ONLY : poisson
-    USE var, ONLY : nzmsize,dv3
-    USE param, ONLY : ntime, nrhotime, npress,ilmn, ivarcoeff, zero, one 
-    USE mpi
-    use navier,only : gradp,velocity_to_momentum,divergence
+  !   USE decomp_2d, ONLY : mytype, xsize, zsize, ph1, nrank, real_type
+  !   USE decomp_2d_poisson, ONLY : poisson
+  !   USE var, ONLY : nzmsize,dv3
+  !   USE param, ONLY : ntime, nrhotime, npress,ilmn, ivarcoeff, zero, one 
+  !   USE mpi
+  !   use navier,only : gradp,velocity_to_momentum,divergence
     
-    implicit none
+  !   implicit none
 
-    !! Inputs
-    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)), INTENT(IN) :: ep1
-    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), nrhotime), INTENT(IN) :: rho1
-    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), ntime), INTENT(IN) :: drho1
-    REAL(mytype), DIMENSION(zsize(1), zsize(2), zsize(3)), INTENT(IN) :: divu3
+  !   !! Inputs
+  !   REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)), INTENT(IN) :: ep1
+  !   REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), nrhotime), INTENT(IN) :: rho1
+  !   REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3), ntime), INTENT(IN) :: drho1
+  !   REAL(mytype), DIMENSION(zsize(1), zsize(2), zsize(3)), INTENT(IN) :: divu3
 
-    !! Outputs
-    REAL(mytype), DIMENSION(ph1%zst(1):ph1%zen(1), ph1%zst(2):ph1%zen(2), nzmsize, npress) :: pp3
-    REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)) :: px1, py1, pz1
+  !   !! Outputs
+  !   REAL(mytype), DIMENSION(ph1%zst(1):ph1%zen(1), ph1%zst(2):ph1%zen(2), nzmsize, npress) :: pp3
+  !   REAL(mytype), DIMENSION(xsize(1), xsize(2), xsize(3)) :: px1, py1, pz1
 
-    !! Locals
-    INTEGER :: nlock, poissiter
-    LOGICAL :: converged
-    REAL(mytype) :: atol, rtol, rho0, divup3norm
-
-
-    nlock = 1 !! Corresponds to computing div(u*)
-    converged = .FALSE.
-    poissiter = 0
-    rho0 = one
+  !   !! Locals
+  !   INTEGER :: nlock, poissiter
+  !   LOGICAL :: converged
+  !   REAL(mytype) :: atol, rtol, rho0, divup3norm
 
 
-
-    CALL divergence(pp3(:,:,:,1),rho1,Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),ep1,drho1,divu3,nlock,identifier='B')
-    !
-    IF (ilmn.AND.ivarcoeff) THEN
-       dv3(:,:,:) = pp3(:,:,:,1)
-    ENDIF
-
-    do while(.not.converged)
-
-       IF (.NOT.converged) THEN
-          CALL poisson(pp3(:,:,:,1))
+  !   nlock = 1 !! Corresponds to computing div(u*)
+  !   converged = .FALSE.
+  !   poissiter = 0
+  !   rho0 = one
 
 
-          !! Need to update pressure gradient here for varcoeff
-          CALL gradp(px1,py1,pz1,pp3(:,:,:,1))
+
+  !   CALL divergence(pp3(:,:,:,1),rho1,Bm(:,:,:,1),Bm(:,:,:,2),Bm(:,:,:,3),ep1,drho1,divu3,nlock,identifier='B')
+  !   !
+  !   IF (ilmn.AND.ivarcoeff) THEN
+  !      dv3(:,:,:) = pp3(:,:,:,1)
+  !   ENDIF
+
+  !   do while(.not.converged)
+
+  !      IF (.NOT.converged) THEN
+  !         CALL poisson(pp3(:,:,:,1))
+
+
+  !         !! Need to update pressure gradient here for varcoeff
+  !         CALL gradp(px1,py1,pz1,pp3(:,:,:,1))
 
          
 
-          IF ((.NOT.ilmn).OR.(.NOT.ivarcoeff)) THEN
-             !! Once-through solver
-             !! - Incompressible flow
-             !! - LMN - constant-coefficient solver
-             converged = .TRUE.
-          ENDIF
-       ENDIF
+  !         IF ((.NOT.ilmn).OR.(.NOT.ivarcoeff)) THEN
+  !            !! Once-through solver
+  !            !! - Incompressible flow
+  !            !! - LMN - constant-coefficient solver
+  !            converged = .TRUE.
+  !         ENDIF
+  !      ENDIF
 
-       poissiter = poissiter + 1
-    enddo
+  !      poissiter = poissiter + 1
+  !   enddo
 
 
-    Bm(:,:,:,1)=Bm(:,:,:,1)-px1
-    Bm(:,:,:,2)=Bm(:,:,:,2)-py1
-    Bm(:,:,:,3)=Bm(:,:,:,3)-pz1
+  !   Bm(:,:,:,1)=Bm(:,:,:,1)-px1
+  !   Bm(:,:,:,2)=Bm(:,:,:,2)-py1
+  !   Bm(:,:,:,3)=Bm(:,:,:,3)-pz1
 
-    sync_Bm_needed=.true.
-    !
-  end subroutine solve_poisson_mhd2
+  !   sync_Bm_needed=.true.
+  !   !
+  ! end subroutine solve_poisson_mhd2
   !
   subroutine  div_check(divec,divmax,divmean)
     !
     USE decomp_2d
-    use partack, only: psum,pmax
     !
     real(mytype),intent(in) :: divec(:,:,:)
     real(mytype),intent(out) :: divmax,divmean
@@ -926,7 +919,6 @@ module mhd
     !
     USE MPI
     USE decomp_2d
-    use partack, only: psum,pmax
     !
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),3),intent(in) :: vec
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)),intent(out) :: divec
@@ -980,7 +972,6 @@ module mhd
     !
     USE decomp_2d
     use var,     only : nx,ny,nz
-    use partack, only: psum
     !
     real(mytype),intent(in),dimension(xsize(1),xsize(2),xsize(3)) ::   &
                                                              ux,uy,uz
@@ -1044,6 +1035,7 @@ module mhd
   !| The end of the subroutine boundary_velocity_check.                |
   !+-------------------------------------------------------------------+
   !
+
   !!############################################################################
   !subroutine DIVERGENCe
   !Calculation of div u* for nlock=1 and of div u^{n+1} for nlock=2
@@ -1051,7 +1043,7 @@ module mhd
   ! output : pp3 (on pressure mesh)
   !written by SL 2018
   !############################################################################
-  function divergence_sclar(vec,nlock) result(pp3)
+  function divergence_scalar(vec,nlock) result(pp3)
 
     USE param
     USE decomp_2d
@@ -1118,55 +1110,32 @@ module mhd
        pp3(:,:,:)=pp3(:,:,:)-pp3(ph1%zst(1),ph1%zst(2),nzmsize)
     endif
 
-    ! tmax=-1609._mytype
-    ! tmoy=zero
-    ! do k=1,nzmsize
-    !    do j=ph1%zst(2),ph1%zen(2)
-    !       do i=ph1%zst(1),ph1%zen(1)
-    !          if (pp3(i,j,k).gt.tmax) tmax=pp3(i,j,k)
-    !          tmoy=tmoy+abs(pp3(i,j,k))
-    !       enddo
-    !    enddo
-    ! enddo
-    ! tmoy=tmoy/nvect3
+    tmax=-1609._mytype
+    tmoy=zero
+    do k=1,nzmsize
+       do j=ph1%zst(2),ph1%zen(2)
+          do i=ph1%zst(1),ph1%zen(1)
+             if (pp3(i,j,k).gt.tmax) tmax=pp3(i,j,k)
+             tmoy=tmoy+abs(pp3(i,j,k))
+          enddo
+       enddo
+    enddo
+    tmoy=tmoy/nvect3
 
-    ! call MPI_REDUCE(tmax,tmax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
-    ! call MPI_REDUCE(tmoy,tmoy1,1,real_type,MPI_SUM,0,MPI_COMM_WORLD,code)
+    call MPI_REDUCE(tmax,tmax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
+    call MPI_REDUCE(tmoy,tmoy1,1,real_type,MPI_SUM,0,MPI_COMM_WORLD,code)
 
-    ! if ((nrank == 0) .and. (nlock > 0).and.(mod(itime, ilist) == 0 .or. itime == ifirst .or. itime==ilast)) then
-    !    if (nlock == 2) then
-    !       write(*,*) 'DIV ucB  max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
-    !    else
-    !       write(*,*) 'DIV ucB* max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
-    !    endif
-    ! endif
+    if ((nrank == 0) .and. (nlock > 0).and.(mod(itime, ilist) == 0 .or. itime == ifirst .or. itime==ilast)) then
+       if (nlock == 2) then
+          write(*,*) 'DIV B  max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
+       else
+          write(*,*) 'DIV B* max mean=',real(tmax1,mytype),real(tmoy1/real(nproc),mytype)
+       endif
+    endif
 
     return
     !
-  end function divergence_sclar
-  !
-  !+-------------------------------------------------------------------+
-  !| This function is to do the cross product for a 3-D vector.        | 
-  !+-------------------------------------------------------------------+
-  !| CHANGE RECORD                                                     |
-  !| -------------                                                     |
-  !| 04-07-2021  | Created by J. Fang @ Warrington                     |
-  !+-------------------------------------------------------------------+
-  pure function cross_product(a,b)
-    !
-    real(8) :: cross_product(3)
-    real(8),dimension(3),intent(in) :: a(3), b(3)
-  
-    cross_product(1) = a(2) * b(3) - a(3) * b(2)
-    cross_product(2) = a(3) * b(1) - a(1) * b(3)
-    cross_product(3) = a(1) * b(2) - a(2) * b(1)
-    !
-    return
-    !
-  end function cross_product
-  !+-------------------------------------------------------------------+
-  !| The end of the function cross_product.                            |
-  !+-------------------------------------------------------------------+
+  end function divergence_scalar
   !
 end module mhd
 !+---------------------------------------------------------------------+

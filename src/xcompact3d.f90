@@ -49,9 +49,9 @@ program xcompact3d
   use ibm_param
   use ibm, only : body
   use genepsi, only : genepsi3d
-  use partack,only : lpartack,particle_velo,write_particle,h5write_particle, &
+  use partack,only : lpartack,write_particle,h5write_particle, &
                      ipartiout,numparticle, partile_inject,numpartix,intt_particel
-  use mhd,    only : Bm,mhd_active,test_magnetic,solve_poisson_mhd,solve_poisson_mhd2
+  use mhd,    only : Bm,mhd_active,test_magnetic,solve_poisson_mhd
 
   implicit none
 
@@ -120,7 +120,7 @@ program xcompact3d
         call cor_vel(ux1,uy1,uz1,px1,py1,pz1)
 
         if(mhd_active) then
-          call solve_poisson_mhd2(rho1,ep1,drho1,divu3)
+          call solve_poisson_mhd()
         endif
 
         if (ilmn) then
