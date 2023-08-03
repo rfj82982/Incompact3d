@@ -205,7 +205,7 @@ contains
     use variables, only : numscalar,nu0nu
     use var, only : ta1, tb1
     use partack, only : lpartack,intt_particel
-    use mhd,     only : mhd_active,int_time_magnet
+    use mhd,     only : mhd_active,mhd_equation,int_time_magnet
     use MPI
 
     IMPLICIT NONE
@@ -308,7 +308,7 @@ contains
     !   call intt_particel()
     ! endif
 
-    if(mhd_active) then
+    if(mhd_active .and. mhd_equation) then
       call int_time_magnet
     endif
 

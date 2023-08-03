@@ -211,6 +211,7 @@ contains
     use MPI
     use navier, only : gradp
     use partack,only : lpartack,particle_file_numb
+    use mhd,    only : mhd_active,mhd_equation,Bm
 
     implicit none
 
@@ -311,6 +312,12 @@ contains
              call decomp_2d_write_one(1,drho1(:,:,:,is),resfile,varname,0,io_restart,reduce_prec=.false.)
           enddo
           call decomp_2d_write_one(1,mu1(:,:,:),resfile,"mu",0,io_restart,reduce_prec=.false.)
+       endif
+       !
+       if(mhd_active .and. mhd_equation) then
+        call decomp_2d_write_one(1,Bm(:,:,:,1),resfile,'bx',0,io_restart,reduce_prec=.false.)
+        call decomp_2d_write_one(1,Bm(:,:,:,2),resfile,'by',0,io_restart,reduce_prec=.false.)
+        call decomp_2d_write_one(1,Bm(:,:,:,3),resfile,'bz',0,io_restart,reduce_prec=.false.)
        endif
 
        call decomp_2d_end_io(io_restart, resfile)
@@ -434,6 +441,12 @@ contains
           call decomp_2d_read_one(1,mu1,resfile,"mu",io_restart,reduce_prec=.false.)
        end if
 
+       if(mhd_active .and. mhd_equation) then
+        call decomp_2d_read_one(1,Bm(:,:,:,1),resfile,'bx',io_restart,reduce_prec=.false.)
+        call decomp_2d_read_one(1,Bm(:,:,:,2),resfile,'by',io_restart,reduce_prec=.false.)
+        call decomp_2d_read_one(1,Bm(:,:,:,3),resfile,'bz',io_restart,reduce_prec=.false.)
+       endif
+       !
        call decomp_2d_end_io(io_restart, resfile)
        call decomp_2d_close_io(io_restart, resfile)
 
@@ -445,7 +458,7 @@ contains
        if (fexists) then
          open(111, file=filename)
          read(111, nml=Time)
-         if(lpartack) read(111, nml=PartiParam)
+         ! if(lpartack) read(111, nml=PartiParam)
          close(111)
          t0 = tfield
          itime0 = 0

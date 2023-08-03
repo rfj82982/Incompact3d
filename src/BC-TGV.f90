@@ -73,14 +73,21 @@ contains
                 !    phi1(i,j,k,1:numscalar)=sin_prec(x)*sin_prec(y)*cos_prec(z)
                 ! endif
 
-                ux1(i,j,k)=-2.d0*sin_prec(y)
-                uy1(i,j,k)= 2.d0*sin_prec(x)
-                uz1(i,j,k)=zero
+                ! ux1(i,j,k)=-2.d0*sin_prec(y)
+                ! uy1(i,j,k)= 2.d0*sin_prec(x)
+                ! uz1(i,j,k)=zero
+                !
+                ux1(i,j,k)= -2.d0*sin_prec(y)
+                uy1(i,j,k)=  2.d0*sin_prec(x)
+                uz1(i,j,k)= zero
                 !
                 if(mhd_active) then
-                  Bm(i,j,k,1)=-2.d0*sin_prec(y)
-                  Bm(i,j,k,2)= 2.d0*sin_prec(2.d0*x)
-                  Bm(i,j,k,3)=zero
+                  ! Bm(i,j,k,1)=-2.d0*sin_prec(y)
+                  ! Bm(i,j,k,2)= 2.d0*sin_prec(2.d0*x)
+                  ! Bm(i,j,k,3)=zero
+                  Bm(i,j,k,1)=0.8d0*(-2.d0*sin_prec(2.d0*y) + sin_prec(z))
+                  Bm(i,j,k,2)=0.8d0*( 2.d0*sin_prec(x)      + sin_prec(z))
+                  Bm(i,j,k,3)=0.8d0*(      sin_prec(x)      + sin_prec(y))
                 endif
                 !
              enddo

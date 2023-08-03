@@ -15,7 +15,7 @@ module mhd
   !
   implicit none
   !
-  logical :: mhd_active,sync_Bm_needed= .true.
+  logical :: mhd_active,mhd_equation,sync_Bm_needed= .true.
   real(8) :: hartmann,stuart,rem
   !+------------+------------------------------------------------------+
   !|  mhd_active| the swith to activate the mhd module.                |
@@ -50,17 +50,21 @@ module mhd
     !
     ! stuart=hartmann**2/re
     !
-    hartmann=sqrt(stuart*re)
+    if(stuart<=1.d-15) then
+      stuart=hartmann**2/re
+    endif
+    if(hartmann<=1.d-15) then
+      hartmann=sqrt(stuart*re)
+    endif
     !
     if(nrank==0) then
       !
-      if(mhd_active) then
-        print*,'** MHD Module activated'
-        print*,'** Hartmann number: ',hartmann
-        print*,'** Stuart number  : ',stuart
-        print*,'** Reynolds number: ',re
-        print*,'** magnetic Reynolds number: ',rem
-      endif
+      print*,'** MHD Module activated'
+      print*,'**    MHD equation:',mhd_equation
+      print*,'** Hartmann number: ',hartmann
+      print*,'**   Stuart number: ',stuart
+      print*,'**              Re: ',re
+      print*,'**     Magnetic Re: ',rem
       !
     endif
     !
@@ -77,14 +81,14 @@ module mhd
     ! Bm(:,:,:,3)=0.d0
     ! !
     ! if(nrank==0) print*,'** magnetic field initilised'
-    !
+    ! !
   end subroutine mhd_init
   !+-------------------------------------------------------------------+
   !| The end of the subroutine mhd_init.                               |
   !+-------------------------------------------------------------------+
   !
   subroutine int_time_magnet
-
+    !
     USE param
     USE variables
     USE decomp_2d
@@ -105,6 +109,173 @@ module mhd
     endif
     !
   end subroutine int_time_magnet
+  !
+  function vortcal(dux1,duy1,duz1) result(omega)
+    !
+    USE decomp_2d
+    USE variables
+    USE param
+    use var, only : ux2, uy2, uz2, ux3, uy3, uz3
+    USE var, only : ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1
+    USE var, only : ta2,tb2,tc2,td2,te2,tf2,di2,ta3,tb3,tc3,td3,te3,tf3,di3
+    use var, ONLY : nxmsize, nymsize, nzmsize
+    use ibm_param, only : ubcx,ubcy,ubcz
+    !
+    ! real(mytype),intent(in),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3),ntime) :: dux1,duy1,duz1
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: omega
+    !
+    ! Perform communications if needed
+    ! if (sync_vel_needed) then
+    !   call transpose_x_to_y(ux1,ux2)
+    !   call transpose_x_to_y(uy1,uy2)
+    !   call transpose_x_to_y(uz1,uz2)
+    !   call transpose_y_to_z(ux2,ux3)
+    !   call transpose_y_to_z(uy2,uy3)
+    !   call transpose_y_to_z(uz2,uz3)
+    !   sync_vel_needed = .false.
+    ! endif
+
+    ! !x-derivatives
+    ! call derx (ta1,ux1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx)
+    ! call derx (tb1,uy1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcy)
+    ! call derx (tc1,uz1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    ! !y-derivatives
+    ! call dery (ta2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+    ! call dery (tb2,uy2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+    ! call dery (tc2,uz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+    ! !!z-derivatives
+    ! call derz (ta3,ux3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
+    ! call derz (tb3,uy3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
+    ! call derz (tc3,uz3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcz)
+    ! !!all back to x-pencils
+    ! call transpose_z_to_y(ta3,td2)
+    ! call transpose_z_to_y(tb3,te2)
+    ! call transpose_z_to_y(tc3,tf2)
+    ! call transpose_y_to_x(td2,tg1)
+    ! call transpose_y_to_x(te2,th1)
+    ! call transpose_y_to_x(tf2,ti1)
+    ! call transpose_y_to_x(ta2,td1)
+    ! call transpose_y_to_x(tb2,te1)
+    ! call transpose_y_to_x(tc2,tf1)
+
+    ! omega(:,:,:)=sqrt(  (tf1(:,:,:)-th1(:,:,:))**2 &
+    !                   + (tg1(:,:,:)-tc1(:,:,:))**2 &
+    !                   + (tb1(:,:,:)-td1(:,:,:))**2)
+    omega(:,:,:)=sqrt(  (duz1(:,:,:,2)-duy1(:,:,:,3))**2 &
+                      + (dux1(:,:,:,3)-duz1(:,:,:,1))**2 &
+                      + (duy1(:,:,:,1)-dux1(:,:,:,2))**2)
+    !
+    return
+    !
+  end function vortcal
+  !
+  !+-------------------------------------------------------------------+
+  !| this subroutine is calculate and output statistics of MHD flow.   |
+  !+-------------------------------------------------------------------+
+  !| change record                                                     |
+  !| -------------                                                     |
+  !| 01-May-2023  | Created by J. Fang STFC Daresbury Laboratory       |
+  !+-------------------------------------------------------------------+
+  subroutine mhd_sta(ux1,uy1,uz1,dux1,duy1,duz1)
+    !
+    use decomp_2d
+    use param,     only : ntime,t,nclx1, ncly1, nclz1,re
+    use var,       only : itime
+    use variables, only : nx, ny, nz, nxm, nym, nzm
+    use mptool,    only : pmax,psum
+    !
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3),ntime) :: dux1,duy1,duz1
+    !
+    ! local data
+    real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: vorticity
+    real(mytype) :: Ek,Em,Omegak,Omegam,Omgmax,Jmax,Omega(3),var1,var2,disrat
+    logical,save :: lfirstcal=.true.
+    integer,save :: nxc,nyc,nzc
+    integer :: i,j,k
+    !
+    if(lfirstcal) then
+      !
+      if(nrank==0) then
+        open(13,file='flowstat.dat')
+        write(13,"(A7,1X,A13,7(1X,A20))")'itime','time',              &
+                                'Ek','Em','Ωk','Ωm','ε','Ωmax','Jmax'
+
+      endif
+      !
+      if (nclx1==1) then
+         nxc=nxm
+      else
+         nxc=nx
+      endif
+      if (ncly1==1) then
+         nyc=nym
+      else
+         nyc=ny
+      endif
+      if (nclz1==1) then
+         nzc=nzm
+      else
+         nzc=nz
+      endif
+      !
+      lfirstcal=.false.
+      !
+    endif
+    !
+    vorticity=vortcal(dux1,duy1,duz1)
+    !
+    Ek=0.d0
+    Em=0.d0
+    Omegak=0.d0
+    Omegam=0.d0
+    Omgmax=0.d0
+    Jmax=0.d0
+    do k=1,xsize(3)
+    do j=1,xsize(2)
+    do i=1,xsize(1)
+
+      var1=vorticity(i,j,k)**2 
+      var2=Je(i,j,k,1)**2+Je(i,j,k,2)**2+Je(i,j,k,3)**2
+
+      Ek    =Ek    + ux1(i,j,k)**2+uy1(i,j,k)**2+uz1(i,j,k)**2
+      Em    =Em    + Bm(i,j,k,1)**2+Bm(i,j,k,2)**2+Bm(i,j,k,3)**2
+      Omegak=Omegak+ var1
+      Omegam=Omegam+ var2
+      Omgmax= max(Omgmax,var1)
+      Jmax  = max(Jmax,var2)
+
+    enddo
+    enddo
+    enddo
+    !
+    Ek    =psum(Ek    )
+    Em    =psum(Em    )
+    Omegak=psum(Omegak)
+    Omegam=psum(Omegam)
+    Omgmax=pmax(Omgmax)
+    Jmax  =pmax(Jmax)
+    !
+    Ek    =Ek    /dble(nxc*nyc*nzc)/2.d0
+    Em    =Em    /dble(nxc*nyc*nzc)/2.d0
+    Omegak=Omegak/dble(nxc*nyc*nzc)/2.d0
+    Omegam=Omegam/dble(nxc*nyc*nzc)/2.d0*Rem*Rem
+    Omgmax=sqrt(Omgmax)
+    Jmax  =sqrt(Jmax)*Rem
+    !
+    disrat=Ek/re+Em/rem
+    ! print*,nxc,nyc,nzc
+    !
+    if(nrank==0) then
+      write(13,"(I7,1X,E13.6E2,7(1X,E20.13E2))")itime,t,Ek,Em,Omegak, &
+                                            Omegam,disrat,Omgmax,Jmax
+    endif
+    !
+  end subroutine mhd_sta
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine mhd_sta.                                |
+  !+-------------------------------------------------------------------+
   !
   !+-------------------------------------------------------------------+
   !| this subroutine is used to add the electromagnetic force to the   |
@@ -139,8 +310,6 @@ module mhd
     !
     real(mytype) :: xx(xsize(1)),yy(xsize(2)),zz(xsize(3))
     !
-    !
-    ! call solve_mhd_poisson(ux1,uy1,uz1)
     !
     ! do i=1,xsize(1)
     !   xx(i)=real(i-1,mytype)*dx
@@ -204,7 +373,11 @@ module mhd
 
     ! call MPI_ALLREDUCE(ub,uball,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
     
-    Je=del_cross_prod(Bm)/Rem
+    if(mhd_equation) then
+      Je=del_cross_prod(Bm)/Rem
+    else
+      Je=solve_mhd_potential_poisson(ux1,uy1,uz1)
+    endif
     !
     do k = 1, xsize(3)
     do j = 1, xsize(2)
@@ -337,7 +510,7 @@ module mhd
   !| -------------                                                     |
   !| 28-Oct-2022  | Created by J. Fang STFC Daresbury Laboratory       |
   !+-------------------------------------------------------------------+
-  subroutine solve_mhd_poisson(ux1,uy1,uz1)
+  function solve_mhd_potential_poisson(ux1,uy1,uz1) result(jcurrent)
 
     use decomp_2d, only : mytype, xsize, zsize, ph1, nrank
     use decomp_2d_poisson, only : poisson
@@ -349,6 +522,7 @@ module mhd
 
     !! inputs
     real(mytype),dimension(xsize(1), xsize(2), xsize(3)),intent(in) :: ux1, uy1, uz1
+    real(mytype),dimension(xsize(1), xsize(2), xsize(3),1:3) :: jcurrent
     !
     !! local data
     real(mytype),dimension(xsize(1), xsize(2), xsize(3), 3) :: ucB
@@ -384,7 +558,7 @@ module mhd
       !
       call poisson(rhs)
       !
-      CALL gradp(Je(:,:,:,1),Je(:,:,:,2),Je(:,:,:,3),rhs)
+      CALL gradp(jcurrent(:,:,:,1),jcurrent(:,:,:,2),jcurrent(:,:,:,3),rhs)
       !
       converged=.true.
     enddo
@@ -393,11 +567,13 @@ module mhd
     do j = 1, xsize(2)
     do i = 1, xsize(1)
       !
-      Je(i,j,k,:)=-Je(i,j,k,:)+ucB(i,j,k,:)
+      jcurrent(i,j,k,:)=-jcurrent(i,j,k,:)+ucB(i,j,k,:)
       !
     enddo
     enddo
     enddo
+    !
+    return
     !
     ! div3=divergence_scalar(Je,nlock)
     ! !
@@ -417,9 +593,9 @@ module mhd
     ! !
     ! call mpistop
     !
-  end subroutine solve_mhd_poisson
+  end function solve_mhd_potential_poisson
   !+-------------------------------------------------------------------+
-  !| The end of the subroutine solve_mhd_poisson.                      |
+  !| The end of the subroutine solve_mhd_potential_poisson.                      |
   !+-------------------------------------------------------------------+
   !
   subroutine calculate_mhd_transeq_rhs(ux1,uy1,uz1)
@@ -750,9 +926,9 @@ module mhd
     call transpose_y_to_x(tc2,tc1) !diff+conv. terms
 
     !DIFFUSIVE TERMS IN X
-    call derxx (td1,ux1,di1,sx,sfx ,ssx ,swx ,xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derxx (te1,uy1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derxx (tf1,uz1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    call derxx (td1,B(:,:,:,1),di1,sx,sfx ,ssx ,swx ,xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derxx (te1,B(:,:,:,2),di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derxx (tf1,B(:,:,:,3),di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcz)
 
     td1(:,:,:) = rrem * td1(:,:,:)
     te1(:,:,:) = rrem * te1(:,:,:)

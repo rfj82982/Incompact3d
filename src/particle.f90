@@ -12,6 +12,8 @@ module partack
   use mptool
   use constants, only : pi
   !
+  implicit none
+  !
   interface mclean
     module procedure mclean_mytype
     module procedure mclean_particle
@@ -71,7 +73,7 @@ module partack
   !
   type(partype),allocatable,target :: particle(:)
   !
-  logical :: lpartack,lorentzforce
+  logical :: lpartack,lorentzforce,lfluidforce
   integer :: numparticle,ipartiout,ipartiadd,particle_file_numb
   real(mytype) :: partirange(6)
   integer :: numpartix(3)
@@ -122,8 +124,8 @@ module partack
     pa%dx=0.0
     pa%dv=0.0
     !
-    pa%dim=1.d-2
-    pa%rho=1000._mytype
+    pa%dim=1.d-1
+    pa%rho=10._mytype
     !
     pa%qe=1.d-5
     !
@@ -296,7 +298,9 @@ module partack
         particle_new(p)%x(2)=y
         particle_new(p)%x(3)=z
         !
-        particle_new(p)%v   =0.d0
+        particle_new(p)%v(1)   =y !0.d0
+        particle_new(p)%v(2)   =0.d0
+        particle_new(p)%v(3)   =0.d0
         !
         particle_new(p)%new=.false.
         !
@@ -340,11 +344,18 @@ module partack
       call h5write_particle()
       !
     else
-      call h5read_particle(particle,numparticle)
+      ! call h5read_particle(particle,numparticle)
+      call particle_gen(particle,numparticle)
+      !
+      particle_file_numb=0
+      !
+      call h5write_particle()
+      !
     endif
     !
-    call partical_domain_check('bc_tgv')
+    ! call partical_domain_check('bc_tgv')
     ! call partical_domain_check('bc_channel')
+    call partical_domain_check('out_disappear')
     !
     !
     ! call partical_swap
@@ -364,9 +375,10 @@ module partack
     h5io_time=0.d0
     !
     particletime=t
-    sub_time_step=0.005d0*dt
+    sub_time_step=dt
+    ! sub_time_step=0.1d0*dt
     !
-    lorentzforce=.true.
+    ! lorentzforce=.true.
     !
   end subroutine init_particle
   !+-------------------------------------------------------------------+
@@ -395,6 +407,7 @@ module partack
     !
     numparticle=numparticle+n
     !
+    ! call partical_domain_check('out_disappear')
     call partical_domain_check('out_disappear')
     !
     call partical_swap
@@ -483,7 +496,7 @@ module partack
     ! local data
     integer :: psize,jpart,npart
     type(partype),pointer :: pa
-    real(mytype) :: varc,vard,varq(3),maxforce,maxvdiff,vdiff,re_p
+    real(mytype) :: varc,vard,varq(3),maxforce,maxvdiff,vdiff,re_p,bmt(3)
     !
     logical,save :: firstcal=.true.
     !
@@ -491,9 +504,19 @@ module partack
       !
       ! if(nrank==0) open(52,file='particle_log')
       !
+      if(.not. allocated(bm)) allocate(bm(xsize(1),xsize(2),xsize(3),1:3))
+      !
+      bm(:,:,:,1)=0.d0
+      bm(:,:,:,2)=1.d0
+      bm(:,:,:,3)=0.d0
+      !
       firstcal=.false.
       !
     endif
+    !
+    bmt(1)=0.d0
+    bmt(2)=1.d0
+    bmt(3)=0.d0
     !
     if(lorentzforce) then
       call field_var(ux1,uy1,uz1,Bm)
@@ -522,37 +545,22 @@ module partack
       ! pa%v=pa%vf
       ! pa%f(:)=0.d0
       !
-      vdiff = norm2(pa%vf-pa%v)
+      pa%f(:) = 0.d0
       !
-      ! vdiff = sqrt( (pa%vf(1)-pa%v(1))**2 + &
-      !               (pa%vf(2)-pa%v(2))**2 + &
-      !               (pa%vf(3)-pa%v(3))**2 )
-      !
-      re_p = pa%dim*vdiff*re
-      !
-      ! if(itime==1) then
-      !   pa%v=pa%vf
-      ! endif
-      !
-      ! get the particle Reynolds number
-      ! call pa%rep()
-      !
-      ! get the force on the particle
-      ! call pa%force()
-      varc=18.d0/(pa%rho*pa%dim**2*re)*(1.d0+0.15d0*re_p**0.687d0)
-      ! varc=18.d0/(pa%rho*pa%dim*re_p)*(1.d0+0.15d0*re_p**0.687d0)*vdiff
-      !
-      pa%f(:) = varc*(pa%vf(:)-pa%v(:))
-      ! pa%f(:) = 0.d0
-      !
-      maxforce=max(maxforce,abs(pa%f(1)),abs(pa%f(2)),abs(pa%f(3)))
-      maxvdiff=max(maxvdiff,vdiff)
+      if(lfluidforce) then
+
+        vdiff = norm2(pa%vf-pa%v)
+        re_p = pa%dim*vdiff*re
+        varc=18.d0/(pa%rho*pa%dim**2*re)*(1.d0+0.15d0*re_p**0.687d0)
+        pa%f(:) = pa%f(:) + varc*(pa%vf(:)-pa%v(:))
+
+      endif
       !
       if(lorentzforce) then
 
         vard = 6.d0/(pi*(pa%dim**3)*pa%rho)*stuart*pa%qe
 
-        varq(:) = cross_product(pa%v(:),pa%b(:))
+        varq(:) = cross_product(pa%v(:),bmt(:))
 
         pa%f(:) = pa%f(:) + vard*varq(:)
 
@@ -570,24 +578,16 @@ module partack
 
       endif
       !
-      ! print*,'** particle--',jpart,pa%vf(1),pa%v(1),pa%f(1)
-      ! if(nrank==3 .and. jpart==38) then
-      !   print*,varc,pa%vf(:)-pa%v(:)
-      ! endif
+      if(lfluidforce .or. lorentzforce) then
+        continue
+      else
+        ! no force acting on particles, purely fluid tracker
+        pa%v=pa%vf
+      endif
       !
-      ! if(itr==3) then
-      !   print*,'** particle--',t,pa%v(1),pa%x(1)
-      ! endif
-      ! if(nrank==3 .and. jpart==101) then
-      !   print*,'-------',pa%x(:)
-      ! ! endif
-      ! print*,'** particle--',jpart,pa%v(:),'-',pa%vf(:),'@',pa%x(:)
-      ! print*,'** particle-- force',pa%f(:)
-      !
-      ! if(itr==3) then
-      !   write(*,'(5(1X,E20.13E2),A)')t,pa%x(1),vdiff,norm2(pa%v),norm2(pa%vf),' p-2-v'
-      ! endif
-      !
+      maxforce=max(maxforce,abs(pa%f(1)),abs(pa%f(2)),abs(pa%f(3)))
+      maxvdiff=max(maxvdiff,vdiff)
+      ! !
       npart=npart+1
       !
       if(npart==numparticle) exit
@@ -595,14 +595,14 @@ module partack
     enddo
     !
     !
-    if(mod(itime,1)==0) then
+    if(mod(itime, ipartiout).eq.0) then
       maxforce=pmax(maxforce)
       maxvdiff=pmax(maxvdiff)
       !
-      ! if(nrank==0) then
-      !   write(52,*)particletime,maxforce,maxvdiff
-      !   ! print*,' ** particle maxforce:',maxforce,'max vdiff:',maxvdiff
-      ! endif
+      if(nrank==0) then
+    !     ! write(52,*)particletime,maxforce,maxvdiff
+        print*,' ** particle maxforce:',maxforce,'max vdiff:',maxvdiff
+      endif
       !
     endif
     !
@@ -763,7 +763,7 @@ module partack
                 print*,'        x2:',x2,y2,z2
                 print*,'      pa%x:',pa%x
                 print*,'      rank:',nrank,'i,j,k',i,j,k
-                print*,'  ux1_halo:',uy1_halo(i:i+1,j:j+1,k:k+1)
+                print*,'  uy1_halo:',uy1_halo(i:i+1,j:j+1,k:k+1)
                 stop
               endif
               !
@@ -785,7 +785,7 @@ module partack
                 print*,'        x2:',x2,y2,z2
                 print*,'      pa%x:',pa%x
                 print*,'      rank:',nrank,'i,j,k',i,j,k
-                print*,'  ux1_halo:',uz1_halo(i:i+1,j:j+1,k:k+1)
+                print*,'  uz1_halo:',uz1_halo(i:i+1,j:j+1,k:k+1)
                 stop
               endif
               !
@@ -909,6 +909,8 @@ module partack
       !
       tsro=sub_time_step/dt
       !
+      particletime=time1
+      !
       firstcal=.false.
       !
       return
@@ -921,7 +923,7 @@ module partack
       !
       particletime=particletime+sub_time_step
       !
-      ! print*,time0,time1,particletime
+      ! print*,'time0=',time0,'time1=',time1,'particletime=',particletime
       !
       uxp=linintp(time0,time1,ux0,ux1,particletime)
       uyp=linintp(time0,time1,uy0,uy1,particletime)
@@ -1039,7 +1041,7 @@ module partack
         !
         pa%v(:)=vcor(:,npart)
         pa%x(:)=xcor(:,npart)
-        pa%x(3)=0.d0 ! 2d x-y computation
+        ! pa%x(3)=0.d0 ! 2d x-y computation
         !
         pa%dv(:,2:ntime)=dvco(:,npart,2:ntime)
         pa%dx(:,2:ntime)=dxco(:,npart,2:ntime)
@@ -1050,7 +1052,8 @@ module partack
       !
       deallocate(xcor,dxco,vcor,dvco)
       !
-      call partical_domain_check('bc_tgv')
+      ! call partical_domain_check('bc_tgv')
+      call partical_domain_check('out_disappear')
       !
       call partical_swap
       !
@@ -1065,6 +1068,7 @@ module partack
         old_num_part=total_num_part
       endif
       !
+      ! if(nrank==0) print*,particletime,time1
     enddo
     !
     ux0=ux1
@@ -1334,6 +1338,7 @@ module partack
           endif
           !
         else
+          print*,' ** particles x: ',pa%x(:)
           stop ' 2 @ partical_domain_check'
         endif
         !

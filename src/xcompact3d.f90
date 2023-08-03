@@ -51,7 +51,8 @@ program xcompact3d
   use genepsi, only : genepsi3d
   use partack,only : lpartack,write_particle,h5write_particle, &
                      ipartiout,numparticle, partile_inject,numpartix,intt_particel
-  use mhd,    only : Bm,mhd_active,test_magnetic,solve_poisson_mhd
+  use mhd,    only : Bm,mhd_active,mhd_equation,test_magnetic, &
+                     solve_poisson_mhd,mhd_sta
 
   implicit none
 
@@ -60,7 +61,7 @@ program xcompact3d
 
   ! call postprocessing(rho1,ux1,uy1,uz1,pp3,phi1,ep1)
 
-  call intt_particel(ux1,uy1,uz1,t)
+  ! call intt_particel(ux1,uy1,uz1,t0)
   
   do itime=ifirst,ilast
      !t=itime*dt
@@ -119,7 +120,7 @@ program xcompact3d
 
         call cor_vel(ux1,uy1,uz1,px1,py1,pz1)
 
-        if(mhd_active) then
+        if(mhd_active .and. mhd_equation) then
           call solve_poisson_mhd()
         endif
 
@@ -133,7 +134,9 @@ program xcompact3d
 
         if(mhd_active) call test_magnetic
 
-        if(lpartack) call intt_particel(ux1,uy1,uz1,t)
+        if(lpartack) then
+          call intt_particel(ux1,uy1,uz1,t)
+        endif
 
      enddo !! End sub timesteps
      !
@@ -142,11 +145,13 @@ program xcompact3d
      !
      if(lpartack .and.(mod(itime, ipartiout).eq.0) ) then
        !
-       call h5write_particle()
-       !
        ! call partile_inject()
        !
+       call h5write_particle()
+       !
      endif
+     !
+     if(mhd_active) call mhd_sta(ux1,uy1,uz1,dux1,duy1,duz1)
      !
      call restart(ux1,uy1,uz1,dux1,duy1,duz1,ep1,pp3(:,:,:,1),phi1,dphi1,px1,py1,pz1,rho1,drho1,mu1,1)
 

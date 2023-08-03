@@ -30,6 +30,7 @@ contains
     use variables
     use param
     use MPI
+    use mhd, only : mhd_active, Bm
     use dbg_schemes, only: exp_prec, abs_prec, sqrt_prec
 
     implicit none
@@ -243,6 +244,16 @@ contains
           enddo
        enddo
     enddo
+
+    if(mhd_active) then
+
+      Bm(:,:,:,1)=0.d0
+      Bm(:,:,:,2)=1.d0
+      Bm(:,:,:,3)=0.d0
+      
+      if(nrank==0) print*,'** magnetic field initilised'
+
+    endif
 
     return
   end subroutine init_channel
