@@ -544,7 +544,7 @@ module ydiff_implicit
 !    isc : 0 for momentum, id of the scalar otherwise
 !    forcing1 : r.h.s. term not present in dvar1 (pressure gradient)
 !
-subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
+subroutine  inttimp (var1,dvar1,npaire,isc,forcing1,mhdvar)
 
   USE MPI
   USE param
@@ -553,6 +553,7 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
   USE decomp_2d
   use derivY
   use matinv
+  use mhd, only: rem
 
   implicit none
 
@@ -561,6 +562,7 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
   !! IN
   real(mytype),dimension(xsize(1),xsize(2),xsize(3)), optional, intent(in) :: forcing1
   integer, intent(in) :: npaire, isc
+  integer, optional, intent(in) :: mhdvar !if integrating an MHD variable: 1=bx, 2=by, 3=bz
 
   !! IN/OUT
   real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: var1
@@ -657,9 +659,20 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
   !
   ! Generic homogeneous cases after
   !
-  else if (isc.ne.0) then
+  else if (isc.gt.0) then
      bcbot(:,:) = g_sc(isc, 1)
      bctop(:,:) = g_sc(isc, 2)
+  elseif(present(mhdvar)) then
+      if(mhdvar.eq.1) then
+         bcbot(:,:) = zero
+         bctop(:,:) = zero   
+      elseif(mhdvar.eq.2) then
+         bcbot(:,:) = one
+         bctop(:,:) = one   
+      elseif(mhdvar.eq.3) then
+         bcbot(:,:) = zero
+         bctop(:,:) = zero
+      endif   
   else
      bcbot(:,:) = zero
      bctop(:,:) = zero
@@ -673,8 +686,16 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
   if (isecondder.ne.5) then
      if (isc.eq.0) then
         call multmatrix7(td2,ta2,tb2,npaire,ncly1,nclyn,xcst)
+     elseif(present(mhdvar)) then
+        if(mhdvar.eq.1) then
+           call multmatrix7(td2,ta2,tb2,npaire,nclyBx1,nclyBxn,xcst * re / rem)
+        elseif(mhdvar.eq.2) then
+           call multmatrix7(td2,ta2,tb2,npaire,nclyBy1,nclyByn,xcst * re / rem)
+        elseif(mhdvar.eq.3) then
+           call multmatrix7(td2,ta2,tb2,npaire,nclyBz1,nclyBzn,xcst * re / rem)
+        endif
      else
-        call multmatrix7(td2,ta2,tb2,npaire,nclyS1,nclySn,xcst_sc(isc))
+        call multmatrix7(td2,ta2,tb2,npaire,nclyBy1,nclyByn,xcst_sc(isc))
      endif
   else if (isecondder.eq.5) then
      !TO BE DONE: Different types of BC
@@ -699,7 +720,28 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
   if ((isc.eq.0.and.nclyn.eq.2).or.(isc.gt.0.and.nclySn.eq.2)) then
      ta2(:,ny,:) = bctop(:,:)
   endif
- 
+
+  if(present(mhdvar)) then
+     if ( mhdvar.eq.1 .and. nclyBx1.eq.2 ) then
+        ta2(:,1,:) = bcbot(:,:)
+     endif
+     if ( mhdvar.eq.1 .and. nclyBxn.eq.2 ) then
+        ta2(:,ny,:) = bctop(:,:)
+     endif 
+     if ( mhdvar.eq.2 .and. nclyBy1.eq.2 ) then
+        ta2(:,1,:) = bcbot(:,:)
+     endif
+     if ( mhdvar.eq.2 .and. nclyByn.eq.2 ) then
+        ta2(:,ny,:) = bctop(:,:)
+     endif 
+     if ( mhdvar.eq.3 .and. nclyBz1.eq.2 ) then
+        ta2(:,1,:) = bcbot(:,:)
+     endif
+     if ( mhdvar.eq.3 .and. nclyBzn.eq.2 ) then
+        ta2(:,ny,:) = bctop(:,:)
+     endif
+  endif 
+
   !Inversion of the linear system Mx=b: (A-xcst.B)u^n+1=uhat+(A+xcst.B)u^n
   !if secondder=5, we need nona inversion
   !if isecondder is not 5, we need septa inversion
@@ -739,12 +781,20 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1)
         gg=>ggm211; hh=>hhm211; ss=>ssm211; rr=>rrm211; vv=>vvm211; ww=>wwm211; zz=>zzm211
      elseif ((isc.gt.0).and.(nclyS1.eq.2).and.(nclySn.eq.1).and.(npaire.eq.1)) then
         gg=>ggm211t(:,isc); hh=>hhm211t(:,isc); ss=>ssm211t(:,isc); rr=>rrm211t(:,isc); vv=>vvm211t(:,isc); ww=>wwm211t(:,isc); zz=>zzm211t(:,isc)
+     elseif(present(mhdvar)) then
+        if (mhdvar.eq.1 .and.(nclyBx1.eq.2).and.(nclyBxn.eq.2)) then   
+           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
+        elseif (mhdvar.eq.2 .and.(nclyBy1.eq.2).and.(nclyByn.eq.2)) then   
+           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
+        elseif (mhdvar.eq.3 .and.(nclyBz1.eq.2).and.(nclyBzn.eq.2)) then   
+           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
+        endif
      else
         ! We should not be here
         if (nrank == 0) then
            write(*,*)  "Error for time-implicit Y diffusion."
            if (isc == 0) write(*,*)  "   Wrong combination for ncly1, nclyn and npaire", ncly1, nclyn, npaire
-           if (isc /= 0) write(*,*)  "   Wrong combination for nclyS1, nclySn and npaire", nclyS1, nclySn, npaire
+           if (isc > 0) write(*,*)  "   Wrong combination for nclyS1, nclySn and npaire", nclyS1, nclySn, npaire
         endif
         call MPI_ABORT(MPI_COMM_WORLD,code,ierror); stop
      endif

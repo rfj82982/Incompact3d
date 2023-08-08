@@ -878,6 +878,243 @@ contains
     allocate(swzpS(nz))
     swzpS=zero
 
+    !MHD -- todo if active
+    allocate(ffxBx(nx))
+    ffxBx=zero
+    allocate(sfxBx(nx))
+    sfxBx=zero
+    allocate(fsxBx(nx))
+    fsxBx=zero
+    allocate(fwxBx(nx))
+    fwxBx=zero
+    allocate(ssxBx(nx))
+    ssxBx=zero
+    allocate(swxBx(nx))
+    swxBx=zero
+
+    allocate(ffxpBx(nx))
+    ffxpBx=zero
+    allocate(sfxpBx(nx))
+    sfxpBx=zero
+    allocate(fsxpBx(nx))
+    fsxpBx=zero
+    allocate(fwxpBx(nx))
+    fwxpBx=zero
+    allocate(ssxpBx(nx))
+    ssxpBx=zero
+    allocate(swxpBx(nx))
+    swxpBx=zero
+
+    allocate(ffyBx(ny))
+    ffyBx=zero
+    allocate(sfyBx(ny))
+    sfyBx=zero
+    allocate(fsyBx(ny))
+    fsyBx=zero
+    allocate(fwyBx(ny))
+    fwyBx=zero
+    allocate(ssyBx(ny))
+    ssyBx=zero
+    allocate(swyBx(ny))
+    swyBx=zero
+
+    allocate(ffypBx(ny))
+    ffypBx=zero
+    allocate(sfypBx(ny))
+    sfypBx=zero
+    allocate(fsypBx(ny))
+    fsypBx=zero
+    allocate(fwypBx(ny))
+    fwypBx=zero
+    allocate(ssypBx(ny))
+    ssypBx=zero
+    allocate(swypBx(ny))
+    swypBx=zero
+
+    allocate(ffzBx(nz))
+    ffzBx=zero
+    allocate(sfzBx(nz))
+    sfzBx=zero
+    allocate(fszBx(nz))
+    fszBx=zero
+    allocate(fwzBx(nz))
+    fwzBx=zero
+    allocate(sszBx(nz))
+    sszBx=zero
+    allocate(swzBx(nz))
+    swzBx=zero
+
+    allocate(ffzpBx(nz))
+    ffzpBx=zero
+    allocate(sfzpBx(nz))
+    sfzpBx=zero
+    allocate(fszpBx(nz))
+    fszpBx=zero
+    allocate(fwzpBx(nz))
+    fwzpBx=zero
+    allocate(sszpBx(nz))
+    sszpBx=zero
+    allocate(swzpBx(nz))
+    swzpBx=zero
+
+    allocate(ffxBy(nx))
+    ffxBy=zero
+    allocate(sfxBy(nx))
+    sfxBy=zero
+    allocate(fsxBy(nx))
+    fsxBy=zero
+    allocate(fwxBy(nx))
+    fwxBy=zero
+    allocate(ssxBy(nx))
+    ssxBy=zero
+    allocate(swxBy(nx))
+    swxBy=zero
+
+    allocate(ffxpBy(nx))
+    ffxpBy=zero
+    allocate(sfxpBy(nx))
+    sfxpBy=zero
+    allocate(fsxpBy(nx))
+    fsxpBy=zero
+    allocate(fwxpBy(nx))
+    fwxpBy=zero
+    allocate(ssxpBy(nx))
+    ssxpBy=zero
+    allocate(swxpBy(nx))
+    swxpBy=zero
+
+    allocate(ffyBy(ny))
+    ffyBy=zero
+    allocate(sfyBy(ny))
+    sfyBy=zero
+    allocate(fsyBy(ny))
+    fsyBy=zero
+    allocate(fwyBy(ny))
+    fwyBy=zero
+    allocate(ssyBy(ny))
+    ssyBy=zero
+    allocate(swyBy(ny))
+    swyBy=zero
+
+    allocate(ffypBy(ny))
+    ffypBy=zero
+    allocate(sfypBy(ny))
+    sfypBy=zero
+    allocate(fsypBy(ny))
+    fsypBy=zero
+    allocate(fwypBy(ny))
+    fwypBy=zero
+    allocate(ssypBy(ny))
+    ssypBy=zero
+    allocate(swypBy(ny))
+    swypBy=zero
+
+    allocate(ffzBy(nz))
+    ffzBy=zero
+    allocate(sfzBy(nz))
+    sfzBy=zero
+    allocate(fszBy(nz))
+    fszBy=zero
+    allocate(fwzBy(nz))
+    fwzBy=zero
+    allocate(sszBy(nz))
+    sszBy=zero
+    allocate(swzBy(nz))
+    swzBy=zero
+
+    allocate(ffzpBy(nz))
+    ffzpBy=zero
+    allocate(sfzpBy(nz))
+    sfzpBy=zero
+    allocate(fszpBy(nz))
+    fszpBy=zero
+    allocate(fwzpBy(nz))
+    fwzpBy=zero
+    allocate(sszpBy(nz))
+    sszpBy=zero
+    allocate(swzpBy(nz))
+    swzpBy=zero
+
+    allocate(ffxBz(nx))
+    ffxBz=zero
+    allocate(sfxBz(nx))
+    sfxBz=zero
+    allocate(fsxBz(nx))
+    fsxBz=zero
+    allocate(fwxBz(nx))
+    fwxBz=zero
+    allocate(ssxBz(nx))
+    ssxBz=zero
+    allocate(swxBz(nx))
+    swxBz=zero
+
+    allocate(ffxpBz(nx))
+    ffxpBz=zero
+    allocate(sfxpBz(nx))
+    sfxpBz=zero
+    allocate(fsxpBz(nx))
+    fsxpBz=zero
+    allocate(fwxpBz(nx))
+    fwxpBz=zero
+    allocate(ssxpBz(nx))
+    ssxpBz=zero
+    allocate(swxpBz(nx))
+    swxpBz=zero
+
+    allocate(ffyBz(ny))
+    ffyBz=zero
+    allocate(sfyBz(ny))
+    sfyBz=zero
+    allocate(fsyBz(ny))
+    fsyBz=zero
+    allocate(fwyBz(ny))
+    fwyBz=zero
+    allocate(ssyBz(ny))
+    ssyBz=zero
+    allocate(swyBz(ny))
+    swyBz=zero
+
+    allocate(ffypBz(ny))
+    ffypBz=zero
+    allocate(sfypBz(ny))
+    sfypBz=zero
+    allocate(fsypBz(ny))
+    fsypBz=zero
+    allocate(fwypBz(ny))
+    fwypBz=zero
+    allocate(ssypBz(ny))
+    ssypBz=zero
+    allocate(swypBz(ny))
+    swypBz=zero
+
+    allocate(ffzBz(nz))
+    ffzBz=zero
+    allocate(sfzBz(nz))
+    sfzBz=zero
+    allocate(fszBz(nz))
+    fszBz=zero
+    allocate(fwzBz(nz))
+    fwzBz=zero
+    allocate(sszBz(nz))
+    sszBz=zero
+    allocate(swzBz(nz))
+    swzBz=zero
+
+    allocate(ffzpBz(nz))
+    ffzpBz=zero
+    allocate(sfzpBz(nz))
+    sfzpBz=zero
+    allocate(fszpBz(nz))
+    fszpBz=zero
+    allocate(fwzpBz(nz))
+    fwzpBz=zero
+    allocate(sszpBz(nz))
+    sszpBz=zero
+    allocate(swzpBz(nz))
+    swzpBz=zero
+
+
+
     allocate(sx(xsize(2),xsize(3)))
     sx=zero
     allocate(vx(xsize(2),xsize(3)))

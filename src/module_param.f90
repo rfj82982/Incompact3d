@@ -70,6 +70,29 @@ module variables
   real(mytype),allocatable,dimension(:) :: ffzS,sfzS,fszS,fwzS,sszS,swzS
   real(mytype),allocatable,dimension(:) :: ffzpS,sfzpS,fszpS,fwzpS,sszpS,swzpS
 
+  real(mytype),allocatable,dimension(:) :: ffxBx,sfxBx,fsxBx,fwxBx,ssxBx,swxBx
+  real(mytype),allocatable,dimension(:) :: ffxpBx,sfxpBx,fsxpBx,fwxpBx,ssxpBx,swxpBx
+  real(mytype),allocatable,dimension(:) :: ffyBx,sfyBx,fsyBx,fwyBx,ssyBx,swyBx
+  real(mytype),allocatable,dimension(:) :: ffypBx,sfypBx,fsypBx,fwypBx,ssypBx,swypBx
+  real(mytype),allocatable,dimension(:) :: ffzBx,sfzBx,fszBx,fwzBx,sszBx,swzBx
+  real(mytype),allocatable,dimension(:) :: ffzpBx,sfzpBx,fszpBx,fwzpBx,sszpBx,swzpBx
+
+  real(mytype),allocatable,dimension(:) :: ffxBy,sfxBy,fsxBy,fwxBy,ssxBy,swxBy
+  real(mytype),allocatable,dimension(:) :: ffxpBy,sfxpBy,fsxpBy,fwxpBy,ssxpBy,swxpBy
+  real(mytype),allocatable,dimension(:) :: ffyBy,sfyBy,fsyBy,fwyBy,ssyBy,swyBy
+  real(mytype),allocatable,dimension(:) :: ffypBy,sfypBy,fsypBy,fwypBy,ssypBy,swypBy
+  real(mytype),allocatable,dimension(:) :: ffzBy,sfzBy,fszBy,fwzBy,sszBy,swzBy
+  real(mytype),allocatable,dimension(:) :: ffzpBy,sfzpBy,fszpBy,fwzpBy,sszpBy,swzpBy
+
+  real(mytype),allocatable,dimension(:) :: ffxBz,sfxBz,fsxBz,fwxBz,ssxBz,swxBz
+  real(mytype),allocatable,dimension(:) :: ffxpBz,sfxpBz,fsxpBz,fwxpBz,ssxpBz,swxpBz
+  real(mytype),allocatable,dimension(:) :: ffyBz,sfyBz,fsyBz,fwyBz,ssyBz,swyBz
+  real(mytype),allocatable,dimension(:) :: ffypBz,sfypBz,fsypBz,fwypBz,ssypBz,swypBz
+  real(mytype),allocatable,dimension(:) :: ffzBz,sfzBz,fszBz,fwzBz,sszBz,swzBz
+  real(mytype),allocatable,dimension(:) :: ffzpBz,sfzpBz,fszpBz,fwzpBz,sszpBz,swzpBz
+
+
+
   real(mytype), save, allocatable, dimension(:,:) :: sx,vx
   real(mytype), save, allocatable, dimension(:,:) :: sy,vy
   real(mytype), save, allocatable, dimension(:,:) :: sz,vz
@@ -176,6 +199,22 @@ module variables
        derzz_00,derzz_11,derzz_12,derzz_21,derzz_22
   PROCEDURE (DERIVATIVE_Z), POINTER :: derz,derzz,derzS,derzzS
 
+  procedure (DERIVATIVE_X), pointer :: derxBx, derxxBx
+  procedure (DERIVATIVE_Y), pointer :: deryBx
+  procedure (DERIVATIVE_YY), pointer :: deryyBx
+  procedure (DERIVATIVE_Z), pointer :: derzBx, derzzBx
+  
+  procedure (DERIVATIVE_X), pointer :: derxBy, derxxBy
+  procedure (DERIVATIVE_Y), pointer :: deryBy
+  procedure (DERIVATIVE_YY), pointer :: deryyBy
+  procedure (DERIVATIVE_Z), pointer :: derzBy, derzzBy
+
+  procedure (DERIVATIVE_X), pointer :: derxBz, derxxBz
+  procedure (DERIVATIVE_Y), pointer :: deryBz
+  procedure (DERIVATIVE_YY), pointer :: deryyBz
+  procedure (DERIVATIVE_Z), pointer :: derzBz, derzzBz
+
+
   !O6SVV
   real(mytype),allocatable,dimension(:) :: newsm,newtm,newsmt,newtmt
   !real(mytype),allocatable,dimension(:) :: newrm,ttm,newrmt,ttmt
@@ -266,6 +305,9 @@ module param
 
   integer :: nclx1,nclxn,ncly1,nclyn,nclz1,nclzn
   integer :: nclxS1,nclxSn,nclyS1,nclySn,nclzS1,nclzSn
+  integer :: nclxBx1,nclxBxn,nclyBx1,nclyBxn,nclzBx1,nclzBxn
+  integer :: nclxBy1,nclxByn,nclyBy1,nclyByn,nclzBy1,nclzByn
+  integer :: nclxBz1,nclxBzn,nclyBz1,nclyBzn,nclzBz1,nclzBzn
 
   !logical variable for boundary condition that is true in periodic case
   !and false otherwise

@@ -77,7 +77,11 @@ subroutine parameter(input_i3d)
   NAMELIST/ALMParam/iturboutput,NTurbines,TurbinesPath,NActuatorlines,ActuatorlinesPath,eps_factor,rho_air
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange,lfluidforce,lorentzforce
-  NAMELIST/MHDParam/mhd_active,mhd_equation,hartmann,stuart,rem
+  NAMELIST/MHDParam/mhd_active,mhd_equation,hartmann,stuart,rem, &
+      nclxBx1, nclxBxn, nclyBx1, nclyBxn, nclzBx1, nclzBxn, &
+      nclxBy1, nclxByn, nclyBy1, nclyByn, nclzBy1, nclzByn, &
+      nclxBz1, nclxBzn, nclyBz1, nclyBzn, nclzBz1, nclzBzn
+
 
 #ifdef DEBG
   if (nrank == 0) write(*,*) '# parameter start'

@@ -271,6 +271,8 @@ contains
     real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux,uy,uz
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),numscalar) :: phi
 
+    integer j 
+
     if (.not. cpg ) then ! if not constant pressure gradient
        if (idir_stream == 1) then
           call channel_cfr(ux,two/three)
@@ -300,6 +302,7 @@ contains
           !if (nclySn.eq.2) g_sc(:,2) = zero
        endif
     endif
+
 
   end subroutine boundary_conditions_channel
   !############################################################################
@@ -394,7 +397,7 @@ contains
     use var, only : ta2,tb2,tc2,td2,te2,tf2,di2,ta3,tb3,tc3,td3,te3,tf3,di3
     use var, ONLY : nzmsize
     use visu, only : write_field
-    use mhd, only : mhd_active,Je
+    use mhd, only : mhd_active,Je, Bm
     
     use ibm_param, only : ubcx,ubcy,ubcz
 
@@ -458,6 +461,10 @@ contains
       call write_field(Je(:,:,:,1), ".", "J_x", num, flush = .true.)
       call write_field(Je(:,:,:,2), ".", "J_y", num, flush = .true.)
       call write_field(Je(:,:,:,3), ".", "J_z", num, flush = .true.)
+      call write_field(Bm(:,:,:,1), ".", "B_x", num, flush = .true.)
+      call write_field(Bm(:,:,:,2), ".", "B_y", num, flush = .true.)
+      call write_field(Bm(:,:,:,3), ".", "B_z", num, flush = .true.)
+
     endif
 
   end subroutine visu_channel
