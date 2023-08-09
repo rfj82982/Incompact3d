@@ -98,37 +98,39 @@ module mhd
     !
     integer :: k
 
-    call inttimp(Bm(:,:,:,1), dBm(:,:,:,1,1), 0, -1, mhdvar=1 )
-    call inttimp(Bm(:,:,:,2), dBm(:,:,:,2,1), 0, -1, mhdvar=2 )
-    call inttimp(Bm(:,:,:,3), dBm(:,:,:,3,1), 0, -1, mhdvar=3 )
+    if( iimplicit == 1 ) then
+        call inttimp(Bm(:,:,:,1), dBm(:,:,:,1,1), 0, -1, mhdvar=1 )
+        call inttimp(Bm(:,:,:,2), dBm(:,:,:,2,1), 0, -1, mhdvar=2 )
+        call inttimp(Bm(:,:,:,3), dBm(:,:,:,3,1), 0, -1, mhdvar=3 )
+    else
+       if(itimescheme.eq.3) then
+           !>>> Adams-Bashforth third order (AB3)
 
-!    if(itimescheme.eq.3) then
-!       !>>> Adams-Bashforth third order (AB3)
-!
-!       ! Do first time step with Euler
-!       if(itime.eq.1.and.irestart.eq.0) then
-!          Bm=dt*dBm(:,:,:,:,1)+Bm
-!       elseif(itime.eq.2.and.irestart.eq.0) then
-!          ! Do second time step with AB2
-!          Bm=onepfive*dt*dBm(:,:,:,:,1)-half*dt*dBm(:,:,:,:,2)+Bm
-!          dBm(:,:,:,:,3)=dBm(:,:,:,:,2)
-!       else
-!          ! Finally using AB3
-!          Bm=adt(itr)*dBm(:,:,:,:,1)+bdt(itr)*dBm(:,:,:,:,2)+cdt(itr)*dBm(:,:,:,:,3)+Bm
-!          dBm(:,:,:,:,3)=dBm(:,:,:,:,2)
-!       endif
-!       dBm(:,:,:,:,2)=dBm(:,:,:,:,1)
-!
-!    elseif(itimescheme.eq.5) then
-!      !
-!       if(itr.eq.1) then
-!          Bm=gdt(itr)*dBm(:,:,:,:,1)+Bm
-!       else
-!          Bm=adt(itr)*dBm(:,:,:,:,1)+bdt(itr)*dBm(:,:,:,:,2)+Bm
-!       endif
-!       dBm(:,:,:,:,2)=dBm(:,:,:,:,1)
-!       !
-!    endif
+           ! Do first time step with Euler
+           if(itime.eq.1.and.irestart.eq.0) then
+              Bm=dt*dBm(:,:,:,:,1)+Bm
+           elseif(itime.eq.2.and.irestart.eq.0) then
+              ! Do second time step with AB2
+              Bm=onepfive*dt*dBm(:,:,:,:,1)-half*dt*dBm(:,:,:,:,2)+Bm
+              dBm(:,:,:,:,3)=dBm(:,:,:,:,2)
+           else
+              ! Finally using AB3
+              Bm=adt(itr)*dBm(:,:,:,:,1)+bdt(itr)*dBm(:,:,:,:,2)+cdt(itr)*dBm(:,:,:,:,3)+Bm
+              dBm(:,:,:,:,3)=dBm(:,:,:,:,2)
+           endif
+           dBm(:,:,:,:,2)=dBm(:,:,:,:,1)
+
+        elseif(itimescheme.eq.5) then
+          !
+           if(itr.eq.1) then
+              Bm=gdt(itr)*dBm(:,:,:,:,1)+Bm
+           else
+              Bm=adt(itr)*dBm(:,:,:,:,1)+bdt(itr)*dBm(:,:,:,:,2)+Bm
+           endif
+           dBm(:,:,:,:,2)=dBm(:,:,:,:,1)
+           !
+       endif
+   endif
     !
   end subroutine int_time_magnet
   !
