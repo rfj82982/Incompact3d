@@ -70,27 +70,12 @@ module variables
   real(mytype),allocatable,dimension(:) :: ffzS,sfzS,fszS,fwzS,sszS,swzS
   real(mytype),allocatable,dimension(:) :: ffzpS,sfzpS,fszpS,fwzpS,sszpS,swzpS
 
-  real(mytype),allocatable,dimension(:) :: ffxBx,sfxBx,fsxBx,fwxBx,ssxBx,swxBx
-  real(mytype),allocatable,dimension(:) :: ffxpBx,sfxpBx,fsxpBx,fwxpBx,ssxpBx,swxpBx
-  real(mytype),allocatable,dimension(:) :: ffyBx,sfyBx,fsyBx,fwyBx,ssyBx,swyBx
-  real(mytype),allocatable,dimension(:) :: ffypBx,sfypBx,fsypBx,fwypBx,ssypBx,swypBx
-  real(mytype),allocatable,dimension(:) :: ffzBx,sfzBx,fszBx,fwzBx,sszBx,swzBx
-  real(mytype),allocatable,dimension(:) :: ffzpBx,sfzpBx,fszpBx,fwzpBx,sszpBx,swzpBx
-
-  real(mytype),allocatable,dimension(:) :: ffxBy,sfxBy,fsxBy,fwxBy,ssxBy,swxBy
-  real(mytype),allocatable,dimension(:) :: ffxpBy,sfxpBy,fsxpBy,fwxpBy,ssxpBy,swxpBy
-  real(mytype),allocatable,dimension(:) :: ffyBy,sfyBy,fsyBy,fwyBy,ssyBy,swyBy
-  real(mytype),allocatable,dimension(:) :: ffypBy,sfypBy,fsypBy,fwypBy,ssypBy,swypBy
-  real(mytype),allocatable,dimension(:) :: ffzBy,sfzBy,fszBy,fwzBy,sszBy,swzBy
-  real(mytype),allocatable,dimension(:) :: ffzpBy,sfzpBy,fszpBy,fwzpBy,sszpBy,swzpBy
-
-  real(mytype),allocatable,dimension(:) :: ffxBz,sfxBz,fsxBz,fwxBz,ssxBz,swxBz
-  real(mytype),allocatable,dimension(:) :: ffxpBz,sfxpBz,fsxpBz,fwxpBz,ssxpBz,swxpBz
-  real(mytype),allocatable,dimension(:) :: ffyBz,sfyBz,fsyBz,fwyBz,ssyBz,swyBz
-  real(mytype),allocatable,dimension(:) :: ffypBz,sfypBz,fsypBz,fwypBz,ssypBz,swypBz
-  real(mytype),allocatable,dimension(:) :: ffzBz,sfzBz,fszBz,fwzBz,sszBz,swzBz
-  real(mytype),allocatable,dimension(:) :: ffzpBz,sfzpBz,fszpBz,fwzpBz,sszpBz,swzpBz
-
+  real(mytype),allocatable,dimension(:,:) :: ffxB,sfxB,fsxB,fwxB,ssxB,swxB
+  real(mytype),allocatable,dimension(:,:) :: ffxpB,sfxpB,fsxpB,fwxpB,ssxpB,swxpB
+  real(mytype),allocatable,dimension(:,:) :: ffyB,sfyB,fsyB,fwyB,ssyB,swyB
+  real(mytype),allocatable,dimension(:,:) :: ffypB,sfypB,fsypB,fwypB,ssypB,swypB
+  real(mytype),allocatable,dimension(:,:) :: ffzB,sfzB,fszB,fwzB,sszB,swzB
+  real(mytype),allocatable,dimension(:,:) :: ffzpB,sfzpB,fszpB,fwzpB,sszpB,swzpB
 
 
   real(mytype), save, allocatable, dimension(:,:) :: sx,vx
@@ -150,8 +135,11 @@ module variables
   ! scalar, ncly1 = 2, nclyn = 1, npaire = 1
   real(mytype), allocatable, target, dimension(:,:) :: aam211t,bbm211t,ccm211t,ddm211t,eem211t,ggm211t,hhm211t,wwm211t,zzm211t
   real(mytype), allocatable, target, dimension(:,:) :: rrm211t,qqm211t,vvm211t,ssm211t
-
-
+  ! Bx, ncly1 = 2, nclyn = 2
+  real(mytype), allocatable, target, dimension(:,:) :: aamB,bbmB,ccmB,ddmB,eemB,ggmB,hhmB,wwmB,zzmB
+  real(mytype), allocatable, target, dimension(:,:) :: rrmB,qqmB,vvmB,ssmB
+  real(mytype), allocatable, target, dimension(:,:) :: sssmB, zzzmB, ttmB, uumB  !!Nona
+  
   ABSTRACT INTERFACE
      SUBROUTINE DERIVATIVE_X(t,u,r,s,ff,fs,fw,nx,ny,nz,npaire,lind)
        use decomp_2d, only : mytype
@@ -308,6 +296,7 @@ module param
   integer :: nclxBx1,nclxBxn,nclyBx1,nclyBxn,nclzBx1,nclzBxn
   integer :: nclxBy1,nclxByn,nclyBy1,nclyByn,nclzBy1,nclzByn
   integer :: nclxBz1,nclxBzn,nclyBz1,nclyBzn,nclzBz1,nclzBzn
+  integer, dimension(3) :: nclxB1,nclxBn,nclyB1,nclyBn,nclzB1,nclzBn
 
   !logical variable for boundary condition that is true in periodic case
   !and false otherwise

@@ -1288,7 +1288,6 @@ module mhd
     !WORK Y-PENCILS
     call interyvp(upi2,duxdxp2,dipp2,sy,cifyp6,cisyp6,ciwyp6,(ph1%yen(1)-ph1%yst(1)+1),ysize(2),nymsize,ysize(3),1)
     call deryvp(duydypi2,uyp2,dipp2,sy,cfy6,csy6,cwy6,ppyi,(ph1%yen(1)-ph1%yst(1)+1),ysize(2),nymsize,ysize(3),0)
-
     !! Compute sum dudx + dvdy
     duydypi2(:,:,:) = duydypi2(:,:,:) + upi2(:,:,:)
 

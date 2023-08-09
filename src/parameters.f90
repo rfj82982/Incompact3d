@@ -209,7 +209,30 @@ subroutine parameter(input_i3d)
   endif
 
   read(10, nml=PartiParam); rewind(10) !! read particle 
-  read(10, nml=MHDParam); rewind(10) !! read mhd 
+  read(10, nml=MHDParam); rewind(10) !! read mhd
+  nclxB1(1) = nclxBx1
+  nclxB1(2) = nclxBy1
+  nclxB1(3) = nclxBz1
+  nclxBn(1) = nclxBxn
+  nclxBn(2) = nclxByn
+  nclxBn(3) = nclxBzn
+  nclyB1(1) = nclyBx1
+  nclyB1(2) = nclyBy1
+  nclyB1(3) = nclyBz1
+  nclyBn(1) = nclyBxn
+  nclyBn(2) = nclyByn
+  nclyBn(3) = nclyBzn
+  nclzB1(1) = nclzBx1
+  nclzB1(2) = nclzBy1
+  nclzB1(3) = nclzBz1
+  nclzBn(1) = nclzBxn
+  nclzBn(2) = nclzByn
+  nclzBn(3) = nclzBzn
+
+
+
+
+
   ! !! These are the 'optional'/model parameters
   ! read(10, nml=ScalarParam)
   if(ilesmod==0) then

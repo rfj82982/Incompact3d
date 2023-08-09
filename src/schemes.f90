@@ -204,34 +204,34 @@ subroutine schemes()
      if (nclzBx1.eq.2.and.nclzBxn.eq.2) derzzBx => derzz_22
      call first_derivative(alfa1x,af1x,bf1x,cf1x,df1x,alfa2x,af2x,alfanx,afnx,bfnx,&
           cfnx,dfnx,alfamx,afmx,alfaix,afix,bfix,&
-          ffxBx,fsxBx,fwxBx,ffxpBx,fsxpBx,fwxpBx,dx,nx,nclxBx1,nclxBxn)
+          ffxB(:,1),fsxB(:,1),fwxB(:,1),ffxpB(:,1),fsxpB(:,1),fwxpB(:,1),dx,nx,nclxBx1,nclxBxn)
      call first_derivative(alfa1y,af1y,bf1y,cf1y,df1y,alfa2y,af2y,alfany,afny,bfny,&
           cfny,dfny,alfamy,afmy,alfajy,afjy,bfjy,&
-          ffyBx,fsyBx,fwyBx,ffypBx,fsypBx,fwypBx,dy,ny,nclyBx1,nclyBxn)
+          ffyB(:,1),fsyB(:,1),fwyB(:,1),ffypB(:,1),fsypB(:,1),fwypB(:,1),dy,ny,nclyBx1,nclyBxn)
      call first_derivative(alfa1z,af1z,bf1z,cf1z,df1z,alfa2z,af2z,alfanz,afnz,bfnz,&
           cfnz,dfnz,alfamz,afmz,alfakz,afkz,bfkz,&
-          ffzBx,fszBx,fwzBx,ffzpBx,fszpBx,fwzpBx,dz,nz,nclzBx1,nclzBxn)
+          ffzB(:,1),fszB(:,1),fwzB(:,1),ffzpB(:,1),fszpB(:,1),fwzpB(:,1),dz,nz,nclzBx1,nclzBxn)
      call second_derivative(alsa1x,as1x,bs1x,&
           cs1x,ds1x,alsa2x,as2x,alsanx,asnx,bsnx,csnx,dsnx,alsamx,&
           asmx,alsa3x,as3x,bs3x,alsatx,astx,bstx,&
           alsa4x,as4x,bs4x,cs4x,&
           alsattx,asttx,bsttx,csttx,&
           alsaix,asix,bsix,csix,dsix,&
-          sfxBx,ssxBx,swxBx,sfxpBx,ssxpBx,swxpBx,dx2,nx,nclxBx1,nclxBxn)
+          sfxB(:,1),ssxB(:,1),swxB(:,1),sfxpB(:,1),ssxpB(:,1),swxpB(:,1),dx2,nx,nclxBx1,nclxBxn)
      call second_derivative(alsa1y,as1y,bs1y,&
           cs1y,ds1y,alsa2y,as2y,alsany,asny,bsny,csny,dsny,alsamy,&
           asmy,alsa3y,as3y,bs3y,alsaty,asty,bsty,&
           alsa4y,as4y,bs4y,cs4y,&
           alsatty,astty,bstty,cstty,&
           alsajy,asjy,bsjy,csjy,dsjy,&
-          sfyBx,ssyBx,swyBx,sfypBx,ssypBx,swypBx,dy2,ny,nclyBx1,nclyBxn)
+          sfyB(:,1),ssyB(:,1),swyB(:,1),sfypB(:,1),ssypB(:,1),swypB(:,1),dy2,ny,nclyBx1,nclyBxn)
      call second_derivative(alsa1z,as1z,bs1z,&
           cs1z,ds1z,alsa2z,as2z,alsanz,asnz,bsnz,csnz,dsnz,alsamz,&
           asmz,alsa3z,as3z,bs3z,alsatz,astz,bstz,&
           alsa4z,as4z,bs4z,cs4z,&
           alsattz,asttz,bsttz,csttz,&
           alsakz,askz,bskz,cskz,dskz,&
-          sfzBx,sszBx,swzBx,sfzpBx,sszpBx,swzpBx,dz2,nz,nclzBx1,nclzBxn)
+          sfzB(:,1),sszB(:,1),swzB(:,1),sfzpB(:,1),sszpB(:,1),swzpB(:,1),dz2,nz,nclzBx1,nclzBxn)
   
      ! First derivative
      if (nclxBy1.eq.0.and.nclxByn.eq.0) derxBy => derx_00
@@ -271,35 +271,34 @@ subroutine schemes()
      if (nclzBy1.eq.2.and.nclzByn.eq.2) derzzBy => derzz_22
      call first_derivative(alfa1x,af1x,bf1x,cf1x,df1x,alfa2x,af2x,alfanx,afnx,bfnx,&
           cfnx,dfnx,alfamx,afmx,alfaix,afix,bfix,&
-          ffxBy,fsxBy,fwxBy,ffxpBy,fsxpBy,fwxpBy,dx,nx,nclxBy1,nclxByn)
+          ffxB(:,2),fsxB(:,2),fwxB(:,2),ffxpB(:,2),fsxpB(:,2),fwxpB(:,2),dx,nx,nclxBy1,nclxByn)
      call first_derivative(alfa1y,af1y,bf1y,cf1y,df1y,alfa2y,af2y,alfany,afny,bfny,&
           cfny,dfny,alfamy,afmy,alfajy,afjy,bfjy,&
-          ffyBy,fsyBy,fwyBy,ffypBy,fsypBy,fwypBy,dy,ny,nclyBy1,nclyByn)
+          ffyB(:,2),fsyB(:,2),fwyB(:,2),ffypB(:,2),fsypB(:,2),fwypB(:,2),dy,ny,nclyBy1,nclyByn)
      call first_derivative(alfa1z,af1z,bf1z,cf1z,df1z,alfa2z,af2z,alfanz,afnz,bfnz,&
           cfnz,dfnz,alfamz,afmz,alfakz,afkz,bfkz,&
-          ffzBy,fszBy,fwzBy,ffzpBy,fszpBy,fwzpBy,dz,nz,nclzBy1,nclzByn)
+          ffzB(:,2),fszB(:,2),fwzB(:,2),ffzpB(:,2),fszpB(:,2),fwzpB(:,2),dz,nz,nclzBy1,nclzByn)
      call second_derivative(alsa1x,as1x,bs1x,&
           cs1x,ds1x,alsa2x,as2x,alsanx,asnx,bsnx,csnx,dsnx,alsamx,&
           asmx,alsa3x,as3x,bs3x,alsatx,astx,bstx,&
           alsa4x,as4x,bs4x,cs4x,&
           alsattx,asttx,bsttx,csttx,&
           alsaix,asix,bsix,csix,dsix,&
-          sfxBy,ssxBy,swxBy,sfxpBy,ssxpBy,swxpBy,dx2,nx,nclxBy1,nclxByn)
+          sfxB(:,2),ssxB(:,2),swxB(:,2),sfxpB(:,2),ssxpB(:,2),swxpB(:,2),dx2,nx,nclxBy1,nclxByn)
      call second_derivative(alsa1y,as1y,bs1y,&
           cs1y,ds1y,alsa2y,as2y,alsany,asny,bsny,csny,dsny,alsamy,&
           asmy,alsa3y,as3y,bs3y,alsaty,asty,bsty,&
           alsa4y,as4y,bs4y,cs4y,&
           alsatty,astty,bstty,cstty,&
           alsajy,asjy,bsjy,csjy,dsjy,&
-          sfyBy,ssyBy,swyBy,sfypBy,ssypBy,swypBy,dy2,ny,nclyBy1,nclyByn)
+          sfyB(:,2),ssyB(:,2),swyB(:,2),sfypB(:,2),ssypB(:,2),swypB(:,2),dy2,ny,nclyBy1,nclyByn)
      call second_derivative(alsa1z,as1z,bs1z,&
           cs1z,ds1z,alsa2z,as2z,alsanz,asnz,bsnz,csnz,dsnz,alsamz,&
           asmz,alsa3z,as3z,bs3z,alsatz,astz,bstz,&
           alsa4z,as4z,bs4z,cs4z,&
           alsattz,asttz,bsttz,csttz,&
           alsakz,askz,bskz,cskz,dskz,&
-          sfzBy,sszBy,swzBy,sfzpBy,sszpBy,swzpBy,dz2,nz,nclzBy1,nclzByn)
-
+          sfzB(:,2),sszB(:,2),swzB(:,2),sfzpB(:,2),sszpB(:,2),swzpB(:,2),dz2,nz,nclzBy1,nclzByn)
      ! First derivative
      if (nclxBz1.eq.0.and.nclxBzn.eq.0) derxBz => derx_00
      if (nclxBz1.eq.1.and.nclxBzn.eq.1) derxBz => derx_11
@@ -338,35 +337,34 @@ subroutine schemes()
      if (nclzBz1.eq.2.and.nclzBzn.eq.2) derzzBz => derzz_22
      call first_derivative(alfa1x,af1x,bf1x,cf1x,df1x,alfa2x,af2x,alfanx,afnx,bfnx,&
           cfnx,dfnx,alfamx,afmx,alfaix,afix,bfix,&
-          ffxBz,fsxBz,fwxBz,ffxpBz,fsxpBz,fwxpBz,dx,nx,nclxBz1,nclxBzn)
+          ffxB(:,3),fsxB(:,3),fwxB(:,3),ffxpB(:,3),fsxpB(:,3),fwxpB(:,3),dx,nx,nclxBz1,nclxBzn)
      call first_derivative(alfa1y,af1y,bf1y,cf1y,df1y,alfa2y,af2y,alfany,afny,bfny,&
           cfny,dfny,alfamy,afmy,alfajy,afjy,bfjy,&
-          ffyBz,fsyBz,fwyBz,ffypBz,fsypBz,fwypBz,dy,ny,nclyBz1,nclyBzn)
+          ffyB(:,3),fsyB(:,3),fwyB(:,3),ffypB(:,3),fsypB(:,3),fwypB(:,3),dy,ny,nclyBz1,nclyBzn)
      call first_derivative(alfa1z,af1z,bf1z,cf1z,df1z,alfa2z,af2z,alfanz,afnz,bfnz,&
           cfnz,dfnz,alfamz,afmz,alfakz,afkz,bfkz,&
-          ffzBz,fszBz,fwzBz,ffzpBz,fszpBz,fwzpBz,dz,nz,nclzBz1,nclzBzn)
+          ffzB(:,3),fszB(:,3),fwzB(:,3),ffzpB(:,3),fszpB(:,3),fwzpB(:,3),dz,nz,nclzBz1,nclzBzn)
      call second_derivative(alsa1x,as1x,bs1x,&
           cs1x,ds1x,alsa2x,as2x,alsanx,asnx,bsnx,csnx,dsnx,alsamx,&
           asmx,alsa3x,as3x,bs3x,alsatx,astx,bstx,&
           alsa4x,as4x,bs4x,cs4x,&
           alsattx,asttx,bsttx,csttx,&
           alsaix,asix,bsix,csix,dsix,&
-          sfxBz,ssxBz,swxBz,sfxpBz,ssxpBz,swxpBz,dx2,nx,nclxBz1,nclxBzn)
+          sfxB(:,3),ssxB(:,3),swxB(:,3),sfxpB(:,3),ssxpB(:,3),swxpB(:,3),dx2,nx,nclxBz1,nclxBzn)
      call second_derivative(alsa1y,as1y,bs1y,&
           cs1y,ds1y,alsa2y,as2y,alsany,asny,bsny,csny,dsny,alsamy,&
           asmy,alsa3y,as3y,bs3y,alsaty,asty,bsty,&
           alsa4y,as4y,bs4y,cs4y,&
           alsatty,astty,bstty,cstty,&
           alsajy,asjy,bsjy,csjy,dsjy,&
-          sfyBz,ssyBz,swyBz,sfypBz,ssypBz,swypBz,dy2,ny,nclyBz1,nclyBzn)
+          sfyB(:,3),ssyB(:,3),swyB(:,3),sfypB(:,3),ssypB(:,3),swypB(:,3),dy2,ny,nclyBz1,nclyBzn)
      call second_derivative(alsa1z,as1z,bs1z,&
           cs1z,ds1z,alsa2z,as2z,alsanz,asnz,bsnz,csnz,dsnz,alsamz,&
           asmz,alsa3z,as3z,bs3z,alsatz,astz,bstz,&
           alsa4z,as4z,bs4z,cs4z,&
           alsattz,asttz,bsttz,csttz,&
           alsakz,askz,bskz,cskz,dskz,&
-          sfzBz,sszBz,swzBz,sfzpBz,sszpBz,swzpBz,dz2,nz,nclzBz1,nclzBzn)
-
+          sfzB(:,3),sszB(:,3),swzB(:,3),sfzpB(:,3),sszpB(:,3),swzpB(:,3),dz2,nz,nclzBz1,nclzBzn)
   endif
 
   call interpolation(dx,nxm,nx,nclx1,nclxn,&

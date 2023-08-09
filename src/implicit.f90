@@ -553,7 +553,6 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1,mhdvar)
   USE decomp_2d
   use derivY
   use matinv
-  use mhd, only: rem
 
   implicit none
 
@@ -687,15 +686,9 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1,mhdvar)
      if (isc.eq.0) then
         call multmatrix7(td2,ta2,tb2,npaire,ncly1,nclyn,xcst)
      elseif(present(mhdvar)) then
-        if(mhdvar.eq.1) then
-           call multmatrix7(td2,ta2,tb2,npaire,nclyBx1,nclyBxn,xcst * re / rem)
-        elseif(mhdvar.eq.2) then
-           call multmatrix7(td2,ta2,tb2,npaire,nclyBy1,nclyByn,xcst * re / rem)
-        elseif(mhdvar.eq.3) then
-           call multmatrix7(td2,ta2,tb2,npaire,nclyBz1,nclyBzn,xcst * re / rem)
-        endif
+        call multmatrix7(td2,ta2,tb2,npaire,nclyB1(mhdvar),nclyBn(mhdvar),xcst * re) !todo: re /Rem
      else
-        call multmatrix7(td2,ta2,tb2,npaire,nclyBy1,nclyByn,xcst_sc(isc))
+        call multmatrix7(td2,ta2,tb2,npaire,nclyS1,nclySn,xcst_sc(isc))
      endif
   else if (isecondder.eq.5) then
      !TO BE DONE: Different types of BC
@@ -722,24 +715,12 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1,mhdvar)
   endif
 
   if(present(mhdvar)) then
-     if ( mhdvar.eq.1 .and. nclyBx1.eq.2 ) then
+     if ( nclyB1(mhdvar).eq.2 ) then
         ta2(:,1,:) = bcbot(:,:)
      endif
-     if ( mhdvar.eq.1 .and. nclyBxn.eq.2 ) then
+     if ( nclyBn(mhdvar).eq.2 ) then
         ta2(:,ny,:) = bctop(:,:)
      endif 
-     if ( mhdvar.eq.2 .and. nclyBy1.eq.2 ) then
-        ta2(:,1,:) = bcbot(:,:)
-     endif
-     if ( mhdvar.eq.2 .and. nclyByn.eq.2 ) then
-        ta2(:,ny,:) = bctop(:,:)
-     endif 
-     if ( mhdvar.eq.3 .and. nclyBz1.eq.2 ) then
-        ta2(:,1,:) = bcbot(:,:)
-     endif
-     if ( mhdvar.eq.3 .and. nclyBzn.eq.2 ) then
-        ta2(:,ny,:) = bctop(:,:)
-     endif
   endif 
 
   !Inversion of the linear system Mx=b: (A-xcst.B)u^n+1=uhat+(A+xcst.B)u^n
@@ -782,12 +763,9 @@ subroutine  inttimp (var1,dvar1,npaire,isc,forcing1,mhdvar)
      elseif ((isc.gt.0).and.(nclyS1.eq.2).and.(nclySn.eq.1).and.(npaire.eq.1)) then
         gg=>ggm211t(:,isc); hh=>hhm211t(:,isc); ss=>ssm211t(:,isc); rr=>rrm211t(:,isc); vv=>vvm211t(:,isc); ww=>wwm211t(:,isc); zz=>zzm211t(:,isc)
      elseif(present(mhdvar)) then
-        if (mhdvar.eq.1 .and.(nclyBx1.eq.2).and.(nclyBxn.eq.2)) then   
-           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
-        elseif (mhdvar.eq.2 .and.(nclyBy1.eq.2).and.(nclyByn.eq.2)) then   
-           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
-        elseif (mhdvar.eq.3 .and.(nclyBz1.eq.2).and.(nclyBzn.eq.2)) then   
-           gg=>ggm; hh=>hhm; ss=>ssm; rr=>rrm; vv=>vvm; ww=>wwm; zz=>zzm
+        if (nclyB1(mhdvar).eq.2 .and. nclyBn(mhdvar).eq.2) then   
+           gg=>ggmB(:,mhdvar); hh=>hhmB(:,mhdvar); ss=>ssmB(:,mhdvar); rr=>rrmB(:,mhdvar); vv=>vvmB(:,mhdvar); ww=>wwmB(:,mhdvar);
+           zz=>zzmB(:,mhdvar)
         endif
      else
         ! We should not be here
@@ -2186,6 +2164,10 @@ if (isecondder.ne.5) then
              qqm211t(:,is),ggm211t(:,is),hhm211t(:,is),ssm211t(:,is),rrm211t(:,is),&
              vvm211t(:,is),wwm211t(:,is),zzm211t(:,is),ny)
      enddo
+     do is = 1, 3
+        call ludecomp7(aamB(:,is),bbmB(:,is),ccmB(:,is),ddmB(:,is),eemB(:,is),qqmB(:,is),ggmB(:,is),hhmB(:,is),ssmB(:,is),rrmB(:,is),&
+            vvmB(:,is),wwmB(:,is),zzmB(:,is),ny)
+     enddo
   else
      call ludecomp9(aam,bbm,ccm,ddm,eem,qqm,ggm,hhm,ssm,rrm,vvm,wwm,zzm,ttm,uum,sssm,zzzm,ny)
      !NEED TO BE DONE: deal with other cases
@@ -2266,6 +2248,12 @@ subroutine init_implicit()
   allocate(aam211t(ny,numscalar),bbm211t(ny,numscalar),ccm211t(ny,numscalar),ddm211t(ny,numscalar),eem211t(ny,numscalar))
   allocate(ggm211t(ny,numscalar),hhm211t(ny,numscalar),wwm211t(ny,numscalar),zzm211t(ny,numscalar))
   allocate(rrm211t(ny,numscalar),qqm211t(ny,numscalar),vvm211t(ny,numscalar),ssm211t(ny,numscalar))
+
+  allocate(aamB(ny,3),bbmB(ny,3),ccmB(ny,3),ddmB(ny,3),eemB(ny,3),ggmB(ny,3),hhmB(ny,3),wwmB(ny,3),zzmB(ny,3))
+  allocate(rrmB(ny,3),qqmB(ny,3),vvmB(ny,3),ssmB(ny,3))
+  allocate(sssmB(ny,3),zzzmB(ny,3),ttmB(ny,3),uumB(ny,3)) ! nona
+
+
 
 end subroutine init_implicit
 
