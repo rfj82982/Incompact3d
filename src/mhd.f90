@@ -742,17 +742,17 @@ module mhd
     tb1(:,:,:) = ux1(:,:,:) * B(:,:,:,2) - B(:,:,:,1) * uy1(:,:,:)
     tc1(:,:,:) = ux1(:,:,:) * B(:,:,:,3) - B(:,:,:,1) * uz1(:,:,:)
     
-    call derx (td1,ta1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcx*ubcx)
-    call derx (te1,tb1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx*ubcy)
-    call derx (tf1,tc1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx*ubcz)
+    call derxBx (td1,ta1,di1,sx,ffxpB(:,1),fsxpB(:,1),fwxpB(:,1),xsize(1),xsize(2),xsize(3),1,ubcx*ubcx)
+    call derxBy (te1,tb1,di1,sx,ffxB(:,2),fsxB(:,2),fwxB(:,2),xsize(1),xsize(2),xsize(3),0,ubcx*ubcy)
+    call derxBz (tf1,tc1,di1,sx,ffxB(:,3),fsxB(:,3),fwxB(:,3),xsize(1),xsize(2),xsize(3),0,ubcx*ubcz)
 
-    call derx (ta1,ux1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derx (tb1,uy1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derx (tc1,uz1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    call derx (ta1,ux1,di1,sx,ffxB(:,1),fsxB(:,1),fwxB(:,1),xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derx (tb1,uy1,di1,sx,ffxpB(:,2),fsxpB(:,2),fwxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derx (tc1,uz1,di1,sx,ffxpB(:,3),fsxpB(:,3),fwxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
     !
-    call derxBx (tx1,B(:,:,:,1),di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derxBy (ty1,B(:,:,:,2),di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derxBz (tz1,B(:,:,:,3),di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    call derxBx (tx1,B(:,:,:,1),di1,sx,ffxB(:,1),fsxB(:,1),fwxB(:,1),xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derxBy (ty1,B(:,:,:,2),di1,sx,ffxpB(:,2),fsxpB(:,2),fwxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derxBz (tz1,B(:,:,:,3),di1,sx,ffxpB(:,3),fsxpB(:,3),fwxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
 
 
     ! Convective terms of x-pencil are stored in tg1,th1,ti1
@@ -777,17 +777,17 @@ module mhd
     te2(:,:,:) =  uy2(:,:,:)*by2(:,:,:) - by2(:,:,:)*uy2(:,:,:) 
     tf2(:,:,:) =  uy2(:,:,:)*bz2(:,:,:) - by2(:,:,:)*uz2(:,:,:) 
 
-    call dery (tg2,td2,di2,sy,ffy,  fsy, fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcx*ubcy)
-    call dery (th2,te2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcy*ubcy)
-    call dery (ti2,tf2,di2,sy,ffy,  fsy, fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcz*ubcy)
+    call deryBx (tg2,td2,di2,sy,ffyB(:,1),  fsyB(:,1), fwyB(:,1),ppy,ysize(1),ysize(2),ysize(3),0,ubcx*ubcy)
+    call deryBy (th2,te2,di2,sy,ffypB(:,2),fsypB(:,2),fwypB(:,2),ppy,ysize(1),ysize(2),ysize(3),1,ubcy*ubcy)
+    call deryBz (ti2,tf2,di2,sy,ffyB(:,3),  fsyB(:,3), fwyB(:,3),ppy,ysize(1),ysize(2),ysize(3),0,ubcz*ubcy)
 
-    call dery (td2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
-    call dery (te2,uy2,di2,sy,ffy,  fsy ,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
-    call dery (tf2,uz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+    call deryBx (td2,ux2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+    call deryBy (te2,uy2,di2,sy,ffyB(:,2),  fsyB(:,2) ,fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+    call deryBz (tf2,uz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
 
-    call deryBx (tx2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
-    call dery (ty2,by2,di2,sy,ffy,  fsy ,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
-    call dery (tz2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+    call deryBx (tx2,bx2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+    call deryBy (ty2,by2,di2,sy,ffyB(:,2),  fsyB(:,2) ,fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+    call deryBz (tz2,bz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
 
 
     ! Convective terms of y-pencil in tg2,th2,ti2
@@ -811,17 +811,17 @@ module mhd
     tf3(:,:,:) =  uz3(:,:,:)*bz3(:,:,:) - bz3(:,:,:)*uz3(:,:,:)
 
 
-    call derz (tg3,td3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcx*ubcz)
-    call derz (th3,te3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcy*ubcz)
-    call derz (ti3,tf3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcz*ubcz)
+    call derzBx (tg3,td3,di3,sz,ffzB(:,1),fszB(:,1),fwzB(:,1),zsize(1),zsize(2),zsize(3),0,ubcx*ubcz)
+    call derzBy (th3,te3,di3,sz,ffzB(:,2),fszB(:,2),fwzB(:,2),zsize(1),zsize(2),zsize(3),0,ubcy*ubcz)
+    call derzBz (ti3,tf3,di3,sz,ffzpB(:,3),fszpB(:,3),fwzpB(:,3),zsize(1),zsize(2),zsize(3),1,ubcz*ubcz)
 
-    call derz (td3,ux3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
-    call derz (te3,uy3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
-    call derz (tf3,uz3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcz)
+    call derzBx (td3,ux3,di3,sz,ffzpB(:,1),fszpB(:,1),fwzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derzBy (te3,uy3,di3,sz,ffzpB(:,2),fszpB(:,2),fwzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derzBz (tf3,uz3,di3,sz,ffzB(:,3),fszB(:,3),fwzB(:,3),zsize(1),zsize(2),zsize(3),0,ubcz)
 
-    call derzBx (tx3,bx3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcx)
-    call derzBy (ty3,by3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),1,ubcy)
-    call derzBz (tz3,bz3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0,ubcz)
+    call derzBx (tx3,bx3,di3,sz,ffzpB(:,1),fszpB(:,1),fwzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derzBy (ty3,by3,di3,sz,ffzpB(:,2),fszpB(:,2),fwzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derzBz (tz3,bz3,di3,sz,ffzB(:,3),fszB(:,3),fwzB(:,3),zsize(1),zsize(2),zsize(3),0,ubcz)
 
     ! Convective terms of z-pencil in ta3,tb3,tc3
 
@@ -836,9 +836,9 @@ module mhd
     tf3(:,:,:) = tc3(:,:,:)
 
     !DIFFUSIVE TERMS IN Z
-    call derzzBx (ta3,bx3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1,ubcx)
-    call derzzBy (tb3,by3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1,ubcy)
-    call derzzBz (tc3,bz3,di3,sz,sfz ,ssz ,swz ,zsize(1),zsize(2),zsize(3),0,ubcz)
+    call derzzBx (ta3,bx3,di3,sz,sfzpB(:,1),sszpB(:,1),swzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
+    call derzzBy (tb3,by3,di3,sz,sfzpB(:,2),sszpB(:,2),swzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
+    call derzzBz (tc3,bz3,di3,sz,sfzB(:,3) ,sszB(:,3) ,swzB(:,3) ,zsize(1),zsize(2),zsize(3),0,ubcz)
 
 
     ! Add convective and diffusive terms of z-pencil (half for skew-symmetric)
@@ -862,9 +862,9 @@ module mhd
     !DIFFUSIVE TERMS IN Y
     if (iimplicit.le.0) then
        !-->for ux
-       call deryyBx (td2,bx2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1,ubcx)
+       call deryyBx (td2,bx2,di2,sy,sfypB(:,1),ssypB(:,1),swypB(:,1),ysize(1),ysize(2),ysize(3),1,ubcx)
        if (istret.ne.0) then
-          call deryBx (te2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+          call deryBx (te2,bx2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
           do k = 1,ysize(3)
              do j = 1,ysize(2)
                 do i = 1,ysize(1)
@@ -875,9 +875,9 @@ module mhd
        endif
 
        !-->for uy
-       call deryyBy (te2,by2,di2,sy,sfy,ssy,swy,ysize(1),ysize(2),ysize(3),0,ubcy)
+       call deryyBy (te2,by2,di2,sy,sfyB(:,2),ssyB(:,2),swyB(:,2),ysize(1),ysize(2),ysize(3),0,ubcy)
        if (istret.ne.0) then
-          call deryBy (tf2,by2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+          call deryBy (tf2,by2,di2,sy,ffyB(:,2),fsyB(:,2),fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
           do k = 1,ysize(3)
              do j = 1,ysize(2)
                 do i = 1,ysize(1)
@@ -888,9 +888,9 @@ module mhd
        endif
 
        !-->for uz
-       call deryyBz (tf2,bz2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1,ubcz)
+       call deryyBz (tf2,bz2,di2,sy,sfypB(:,3),ssypB(:,3),swypB(:,3),ysize(1),ysize(2),ysize(3),1,ubcz)
        if (istret.ne.0) then
-          call deryBz (tj2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+          call deryBz (tj2,bz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
           do k = 1,ysize(3)
              do j = 1,ysize(2)
                 do i = 1,ysize(1)
@@ -903,7 +903,7 @@ module mhd
        if (istret.ne.0) then
 
           !-->for ux
-          call deryBx (te2,bx2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
+          call deryBx (te2,bx2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
           do k=1,ysize(3)
              do j=1,ysize(2)
                 do i=1,ysize(1)
@@ -912,7 +912,7 @@ module mhd
              enddo
           enddo
           !-->for uy
-          call deryBy (tf2,by2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
+          call deryBy (tf2,by2,di2,sy,ffyB(:,2),fsyB(:,2),fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
           do k=1,ysize(3)
              do j=1,ysize(2)
                 do i=1,ysize(1)
@@ -921,7 +921,7 @@ module mhd
              enddo
           enddo
           !-->for uz
-          call deryBz (tj2,bz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
+          call deryBz (tj2,bz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
           do k=1,ysize(3)
              do j=1,ysize(2)
                 do i=1,ysize(1)
@@ -950,9 +950,9 @@ module mhd
     call transpose_y_to_x(tc2,tc1) !diff+conv. terms
 
     !DIFFUSIVE TERMS IN X
-    call derxxBx (td1,B(:,:,:,1),di1,sx,sfx ,ssx ,swx ,xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derxxBy (te1,B(:,:,:,2),di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derxxBz (tf1,B(:,:,:,3),di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1,ubcz)
+    call derxxBx (td1,B(:,:,:,1),di1,sx,sfxB(:,1) ,ssxB(:,1) ,swxB(:,1) ,xsize(1),xsize(2),xsize(3),0,ubcx)
+    call derxxBy (te1,B(:,:,:,2),di1,sx,sfxpB(:,2),ssxpB(:,2),swxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
+    call derxxBz (tf1,B(:,:,:,3),di1,sx,sfxpB(:,3),ssxpB(:,3),swxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
 
     td1(:,:,:) = rrem * td1(:,:,:)
     te1(:,:,:) = rrem * te1(:,:,:)
