@@ -15,7 +15,7 @@
 subroutine parameter(input_i3d)
 
   use mpi
-  
+
   use iso_fortran_env
 
   use param
@@ -78,9 +78,9 @@ subroutine parameter(input_i3d)
   NAMELIST/ADMParam/Ndiscs,ADMcoords,C_T,aind,iturboutput,rho_air
   NAMELIST/PartiParam/ipartiout,numpartix,partirange,lfluidforce,lorentzforce
   NAMELIST/MHDParam/mhd_active,mhd_equation,hartmann,stuart,rem, &
-      nclxBx1, nclxBxn, nclyBx1, nclyBxn, nclzBx1, nclzBxn, &
-      nclxBy1, nclxByn, nclyBy1, nclyByn, nclzBy1, nclzByn, &
-      nclxBz1, nclxBzn, nclyBz1, nclyBzn, nclzBz1, nclzBzn
+       nclxBx1, nclxBxn, nclyBx1, nclyBxn, nclzBx1, nclzBxn, &
+       nclxBy1, nclxByn, nclyBy1, nclyByn, nclzBy1, nclzByn, &
+       nclxBz1, nclxBzn, nclyBz1, nclyBzn, nclzBz1, nclzBzn
 
 
 #ifdef DEBG
@@ -130,12 +130,12 @@ subroutine parameter(input_i3d)
      allocate(xld(nvol), xrd(nvol), yld(nvol), yud(nvol))!, zld(nvol), zrd(nvol))
      read(10, nml=ForceCVs); rewind(10)
   endif
-  
+
   !! Set Scalar BCs same as fluid (may be overridden) [DEFAULT]
   nclxS1 = nclx1; nclxSn = nclxn
   nclyS1 = ncly1; nclySn = nclyn
   nclzS1 = nclz1; nclzSn = nclzn
-  
+
   if (numscalar.ne.0) then
      iscalar = 1
 
@@ -296,10 +296,10 @@ subroutine parameter(input_i3d)
   xnu=one/re
   !! Constant pressure gradient, re = Re_tau -> use to compute Re_centerline
   if (cpg) then
-    re_cent = (re/0.116_mytype)**(1.0_mytype/0.88_mytype)
-    xnu = one/re_cent ! viscosity based on Re_cent to keep same scaling as CFR
-    !
-    fcpg = two/yly * (re/re_cent)**2
+     re_cent = (re/0.116_mytype)**(1.0_mytype/0.88_mytype)
+     xnu = one/re_cent ! viscosity based on Re_cent to keep same scaling as CFR
+     !
+     fcpg = two/yly * (re/re_cent)**2
   end if
 
   if (ilmn) then
@@ -344,6 +344,7 @@ subroutine parameter(input_i3d)
         stop
      endif
      if (iscalar.eq.1) xcst_sc = xcst / sc
+     if (mhd_active) xcstB = xcst / rem * re  
   endif
 
   if (itype==itype_tbl.and.A_tr .gt. zero.and.nrank==0)  write(*,*)  "TBL tripping is active"
@@ -395,17 +396,17 @@ subroutine parameter(input_i3d)
      endif
      print *,'==========================================================='
      if (itype.eq.itype_channel) then
-       if (.not.cpg) then
-         write(*,*) 'Channel forcing with constant flow rate (CFR)'
-         write(*,"(' Re_cl                  : ',F17.3)") re
-       else 
-         write(*,*) 'Channel forcing with constant pressure gradient (CPG)'
-         write(*,"(' Re_tau                 : ',F17.3)") re
-         write(*,"(' Re_cl (estimated)      : ',F17.3)") re_cent
-         write(*,"(' fcpg                   : ',F17.8)") fcpg
-       end if
+        if (.not.cpg) then
+           write(*,*) 'Channel forcing with constant flow rate (CFR)'
+           write(*,"(' Re_cl                  : ',F17.3)") re
+        else 
+           write(*,*) 'Channel forcing with constant pressure gradient (CPG)'
+           write(*,"(' Re_tau                 : ',F17.3)") re
+           write(*,"(' Re_cl (estimated)      : ',F17.3)") re_cent
+           write(*,"(' fcpg                   : ',F17.8)") fcpg
+        end if
      else
-       write(*,"(' Reynolds number Re     : ',F17.3)") re
+        write(*,"(' Reynolds number Re     : ',F17.3)") re
      endif
      write(*,"(' xnu                    : ',F17.8)") xnu
      write(*,*) '==========================================================='
@@ -414,53 +415,53 @@ subroutine parameter(input_i3d)
      write(*,"(' Time step dt           : ',F17.8)") dt
      !
      if (itimescheme.eq.1) then
-       !print *,'Temporal scheme        : Forwards Euler'
-       write(*,"(' Temporal scheme        : ',A20)") "Forwards Euler"
+        !print *,'Temporal scheme        : Forwards Euler'
+        write(*,"(' Temporal scheme        : ',A20)") "Forwards Euler"
      elseif (itimescheme.eq.2) then
-       !print *,'Temporal scheme        : Adams-bashforth 2'
-       write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 2"
+        !print *,'Temporal scheme        : Adams-bashforth 2'
+        write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 2"
      elseif (itimescheme.eq.3) then
-       !print *,'Temporal scheme        : Adams-bashforth 3'
-       write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 3"
+        !print *,'Temporal scheme        : Adams-bashforth 3'
+        write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 3"
      elseif (itimescheme.eq.4) then
-       !print *,'Temporal scheme        : Adams-bashforth 4'
-       write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 4"
-       print *,'Error: Adams-bashforth 4 not implemented!'
-       stop
+        !print *,'Temporal scheme        : Adams-bashforth 4'
+        write(*,"(' Temporal scheme        : ',A20)") "Adams-bashforth 4"
+        print *,'Error: Adams-bashforth 4 not implemented!'
+        stop
      elseif (itimescheme.eq.5) then
-       !print *,'Temporal scheme        : Runge-kutta 3'
-       write(*,"(' Temporal scheme        : ',A20)") "Runge-kutta 3"
+        !print *,'Temporal scheme        : Runge-kutta 3'
+        write(*,"(' Temporal scheme        : ',A20)") "Runge-kutta 3"
      elseif (itimescheme.eq.6) then
-       !print *,'Temporal scheme        : Runge-kutta 4'
-       write(*,"(' Temporal scheme        : ',A20)") "Runge-kutta 4"
-       print *,'Error: Runge-kutta 4 not implemented!'
-       stop
+        !print *,'Temporal scheme        : Runge-kutta 4'
+        write(*,"(' Temporal scheme        : ',A20)") "Runge-kutta 4"
+        print *,'Error: Runge-kutta 4 not implemented!'
+        stop
      else
-       print *,'Error: itimescheme must be specified as 1-6'
-       stop
+        print *,'Error: itimescheme must be specified as 1-6'
+        stop
      endif
      !
      if (iimplicit.ne.0) then
-       if (iimplicit.eq.1) then
-         write(*,"('                          ',A40)") "With backward Euler for Y diffusion"
-       else if (iimplicit.eq.2) then
-         write(*,"('                          ',A40)") "With CN for Y diffusion"
-       endif
+        if (iimplicit.eq.1) then
+           write(*,"('                          ',A40)") "With backward Euler for Y diffusion"
+        else if (iimplicit.eq.2) then
+           write(*,"('                          ',A40)") "With CN for Y diffusion"
+        endif
      endif
      !
      if (ilesmod.ne.0) then
-       write(*,*) '                   : DNS'
+        write(*,*) '                   : DNS'
      else
-       if (jles==1) then
-          write(*,*) '                   : Phys Smag'
-       else if (jles==2) then
-          write(*,*) '                   : Phys WALE'
-       else if (jles==3) then
-          write(*,*) '                   : Phys dyn. Smag'
-       else if (jles==4) then
-          write(*,*) '                   : iSVV'
-       else
-       endif
+        if (jles==1) then
+           write(*,*) '                   : Phys Smag'
+        else if (jles==2) then
+           write(*,*) '                   : Phys WALE'
+        else if (jles==3) then
+           write(*,*) '                   : Phys dyn. Smag'
+        else if (jles==4) then
+           write(*,*) '                   : iSVV'
+        else
+        endif
      endif
      write(*,*) '==========================================================='
      write(*,"(' ifirst                 : ',I17)") ifirst
@@ -483,43 +484,43 @@ subroutine parameter(input_i3d)
      if (iscalar==1) write(*,"(' Scalar                 : ',A17)") "on"
      write(*,"(' numscalar              : ',I17)") numscalar
      if (iscalar.eq.1) then
-       do is=1, numscalar
-          write(*,"(' Schmidt number sc(',I2,')  : ',F17.8)") is, sc(is)
-          write(*,"(' Richardson n.  ri(',I2,')  : ',F17.8)") is, ri(is)
-          if (scalar_lbound(is).gt.-huge(one)) then
-             write(*,"(' Lower bound      (',I2,')  : ',F17.8)") is, scalar_lbound(is)
-          else
-             ! This is the default option, no information printed in the listing
-          endif
-          if (scalar_ubound(is).lt.huge(one)) then
-             write(*,"(' Upper bound      (',I2,')  : ',F17.8)") is, scalar_ubound(is)
-          else
-             ! This is the default option, no information printed in the listing
-          endif
-          if (iscalar.eq.1) then
-             if (nclxS1.eq.1 .or. nclxSn.eq.1 .or. &
-                 nclyS1.eq.1 .or. nclySn.eq.1 .or. &
-                 nclzS1.eq.1 .or. nclzSn.eq.1) then
-                if (sc_even(is)) then
-                   ! This is the default option, no information printed in the listing
-                else
-                   write(*,"(' Scalar ',I2,' is odd')") is
-                endif
-             endif
-             if (sc_skew(is)) then
-                write(*,"(' Scalar ',I2,' with skew-symmetric convection')") is
-             else
-                ! This is the default option, no information printed in the listing
-             endif
-          endif
-       end do
+        do is=1, numscalar
+           write(*,"(' Schmidt number sc(',I2,')  : ',F17.8)") is, sc(is)
+           write(*,"(' Richardson n.  ri(',I2,')  : ',F17.8)") is, ri(is)
+           if (scalar_lbound(is).gt.-huge(one)) then
+              write(*,"(' Lower bound      (',I2,')  : ',F17.8)") is, scalar_lbound(is)
+           else
+              ! This is the default option, no information printed in the listing
+           endif
+           if (scalar_ubound(is).lt.huge(one)) then
+              write(*,"(' Upper bound      (',I2,')  : ',F17.8)") is, scalar_ubound(is)
+           else
+              ! This is the default option, no information printed in the listing
+           endif
+           if (iscalar.eq.1) then
+              if (nclxS1.eq.1 .or. nclxSn.eq.1 .or. &
+                   nclyS1.eq.1 .or. nclySn.eq.1 .or. &
+                   nclzS1.eq.1 .or. nclzSn.eq.1) then
+                 if (sc_even(is)) then
+                    ! This is the default option, no information printed in the listing
+                 else
+                    write(*,"(' Scalar ',I2,' is odd')") is
+                 endif
+              endif
+              if (sc_skew(is)) then
+                 write(*,"(' Scalar ',I2,' with skew-symmetric convection')") is
+              else
+                 ! This is the default option, no information printed in the listing
+              endif
+           endif
+        end do
      endif
      write(*,*) '==========================================================='
      if (lpartack) then
-       write(*,"(' Particle tracking      : ',A17)") "on"
-       write(*,"(' numparticle            : ',I17)") numparticle
+        write(*,"(' Particle tracking      : ',A17)") "on"
+        write(*,"(' numparticle            : ',I17)") numparticle
      else
-       write(*,"(' Particle tracking      : ',A17)") "off"
+        write(*,"(' Particle tracking      : ',A17)") "off"
      endif
      write(*,*) '==========================================================='
      write(*,"(' spinup_time            : ',I17)") spinup_time
@@ -527,17 +528,17 @@ subroutine parameter(input_i3d)
      write(*,*) '==========================================================='
      if (iibm==0) write(*,"(' Immersed boundary      : ',A17)") "off"
      if (iibm.gt.1) then
-      write(*,"(' Immersed boundary      : ',A17)") "on"
-      write(*,"(' iibm                   : ',I17)") iibm
+        write(*,"(' Immersed boundary      : ',A17)") "on"
+        write(*,"(' iibm                   : ',I17)") iibm
      end if
      if (iibm==1) write(*,*) 'Simple immersed boundary method'
      if (iibm==2) then
-       write(*,*) 'Lagrangian polynomial reconstruction'
-       write(*,*) '==========================================================='
-       write(*,"(' npif                   : ',I17)") npif
-       write(*,"(' izap                   : ',I17)") izap
-       write(*,"(' nraf                   : ',I17)") nraf
-       write(*,"(' nobjmax                : ',I17)") nobjmax
+        write(*,*) 'Lagrangian polynomial reconstruction'
+        write(*,*) '==========================================================='
+        write(*,"(' npif                   : ',I17)") npif
+        write(*,"(' izap                   : ',I17)") izap
+        write(*,"(' nraf                   : ',I17)") nraf
+        write(*,"(' nobjmax                : ',I17)") nobjmax
      end if
      write(*,*) '==========================================================='
      write(*,"(' Boundary condition velocity field: ')")
@@ -546,11 +547,11 @@ subroutine parameter(input_i3d)
      write(*,"(' nclz1, nclzn           : ',I15,',',I1 )") nclz1,nclzn
      write(*,*) '==========================================================='
      if ((iscalar==1).or.(ilmn)) then
-       write(*,"(' Boundary condition scalar field: ')")
-       write(*,"(' nclxS1, nclxSn         : ',I15,',',I1 )") nclxS1,nclxSn
-       write(*,"(' nclyS1, nclySn         : ',I15,',',I1 )") nclyS1,nclySn
-       write(*,"(' nclzS1, nclzSn         : ',I15,',',I1 )") nclzS1,nclzSn
-       write(*,*) '==========================================================='
+        write(*,"(' Boundary condition scalar field: ')")
+        write(*,"(' nclxS1, nclxSn         : ',I15,',',I1 )") nclxS1,nclxSn
+        write(*,"(' nclyS1, nclySn         : ',I15,',',I1 )") nclyS1,nclySn
+        write(*,"(' nclzS1, nclzSn         : ',I15,',',I1 )") nclzS1,nclzSn
+        write(*,*) '==========================================================='
      endif
 
 #ifdef DOUBLE_PREC
@@ -588,7 +589,7 @@ subroutine parameter(input_i3d)
      endif
      write(*,*) '==========================================================='
   endif
-  
+
   if (iibm.eq.3) then ! This is only for the Cubic Spline Reconstruction
      npif=npif+1
   endif

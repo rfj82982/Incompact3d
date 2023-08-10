@@ -139,7 +139,7 @@ module variables
   real(mytype), allocatable, target, dimension(:,:) :: aamB,bbmB,ccmB,ddmB,eemB,ggmB,hhmB,wwmB,zzmB
   real(mytype), allocatable, target, dimension(:,:) :: rrmB,qqmB,vvmB,ssmB
   real(mytype), allocatable, target, dimension(:,:) :: sssmB, zzzmB, ttmB, uumB  !!Nona
-  
+
   ABSTRACT INTERFACE
      SUBROUTINE DERIVATIVE_X(t,u,r,s,ff,fs,fw,nx,ny,nz,npaire,lind)
        use decomp_2d, only : mytype
@@ -191,7 +191,7 @@ module variables
   procedure (DERIVATIVE_Y), pointer :: deryBx
   procedure (DERIVATIVE_YY), pointer :: deryyBx
   procedure (DERIVATIVE_Z), pointer :: derzBx, derzzBx
-  
+
   procedure (DERIVATIVE_X), pointer :: derxBy, derxxBy
   procedure (DERIVATIVE_Y), pointer :: deryBy
   procedure (DERIVATIVE_YY), pointer :: deryyBy
@@ -353,7 +353,7 @@ module param
   real(mytype) :: cfl_diff_x,cfl_diff_y,cfl_diff_z,cfl_diff_sum
 
   !!
-  real(mytype) :: xcst
+  real(mytype) :: xcst, xcstB
   real(mytype), allocatable, dimension(:) :: xcst_sc
   real(mytype), allocatable, dimension(:,:) :: alpha_sc, beta_sc, g_sc
   real(mytype) :: g_bl_inf, f_bl_inf
@@ -407,7 +407,7 @@ module param
   integer :: NTurbines, NActuatorlines
   character, dimension(100) :: TurbinesPath*80, ActuatorlinesPath*80
   real(mytype) :: eps_factor ! Smoothing factor
-  
+
   character :: filesauve*80, filenoise*80, &
        nchamp*80,filepath*80, fileturb*80, filevisu*80, datapath*80
   real(mytype), dimension(5) :: adt,bdt,cdt,ddt,gdt
