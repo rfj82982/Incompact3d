@@ -735,33 +735,12 @@ module mhd
 
     rrem=1.d0/Rem
 
-    !SKEW SYMMETRIC FORM
-
     !WORK X-PENCILS
-    ta1(:,:,:) = ux1(:,:,:) * B(:,:,:,1) - B(:,:,:,1) * ux1(:,:,:) 
-    tb1(:,:,:) = ux1(:,:,:) * B(:,:,:,2) - B(:,:,:,1) * uy1(:,:,:)
-    tc1(:,:,:) = ux1(:,:,:) * B(:,:,:,3) - B(:,:,:,1) * uz1(:,:,:)
-    
-    call derxBx (td1,ta1,di1,sx,ffxpB(:,1),fsxpB(:,1),fwxpB(:,1),xsize(1),xsize(2),xsize(3),1,ubcx*ubcx)
+    tb1(:,:,:) = ux1(:,:,:) * B(:,:,:,3) - B(:,:,:,1) * uz1(:,:,:)
+    tc1(:,:,:) = ux1(:,:,:) * B(:,:,:,2) - B(:,:,:,1) * uy1(:,:,:)
+
     call derxBy (te1,tb1,di1,sx,ffxB(:,2),fsxB(:,2),fwxB(:,2),xsize(1),xsize(2),xsize(3),0,ubcx*ubcy)
     call derxBz (tf1,tc1,di1,sx,ffxB(:,3),fsxB(:,3),fwxB(:,3),xsize(1),xsize(2),xsize(3),0,ubcx*ubcz)
-
-    call derx (ta1,ux1,di1,sx,ffxB(:,1),fsxB(:,1),fwxB(:,1),xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derx (tb1,uy1,di1,sx,ffxpB(:,2),fsxpB(:,2),fwxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derx (tc1,uz1,di1,sx,ffxpB(:,3),fsxpB(:,3),fwxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
-    !
-    call derxBx (tx1,B(:,:,:,1),di1,sx,ffxB(:,1),fsxB(:,1),fwxB(:,1),xsize(1),xsize(2),xsize(3),0,ubcx)
-    call derxBy (ty1,B(:,:,:,2),di1,sx,ffxpB(:,2),fsxpB(:,2),fwxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
-    call derxBz (tz1,B(:,:,:,3),di1,sx,ffxpB(:,3),fsxpB(:,3),fwxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
-
-
-    ! Convective terms of x-pencil are stored in tg1,th1,ti1
-    
-    tg1(:,:,:) = td1(:,:,:)  + ux1(:,:,:) * tx1(:,:,:) - B(:,:,:,1) * ta1(:,:,:)
-    th1(:,:,:) = te1(:,:,:)  + ux1(:,:,:) * ty1(:,:,:) - B(:,:,:,1) * tb1(:,:,:)
-    ti1(:,:,:) = tf1(:,:,:)  + ux1(:,:,:) * tz1(:,:,:) - B(:,:,:,1) * tc1(:,:,:)
-
-    ! TODO: save the x-convective terms already in dux1, duy1, duz1
 
     call transpose_x_to_y(ux1,ux2)
     call transpose_x_to_y(uy1,uy2)
@@ -773,28 +752,12 @@ module mhd
 
 
     !WORK Y-PENCILS
-    td2(:,:,:) =  uy2(:,:,:)*bx2(:,:,:) - by2(:,:,:)*ux2(:,:,:) 
-    te2(:,:,:) =  uy2(:,:,:)*by2(:,:,:) - by2(:,:,:)*uy2(:,:,:) 
-    tf2(:,:,:) =  uy2(:,:,:)*bz2(:,:,:) - by2(:,:,:)*uz2(:,:,:) 
+    ta2(:,:,:) = uy2(:,:,:) * Bz2(:,:,:) - by2 * uz2(:,:,:) 
+    tc2(:,:,:) = ux2(:,:,:) * by2(:,:,:) - bx2 * uy2(:,:,:)
 
-    call deryBx (tg2,td2,di2,sy,ffyB(:,1),  fsyB(:,1), fwyB(:,1),ppy,ysize(1),ysize(2),ysize(3),0,ubcx*ubcy)
-    call deryBy (th2,te2,di2,sy,ffypB(:,2),fsypB(:,2),fwypB(:,2),ppy,ysize(1),ysize(2),ysize(3),1,ubcy*ubcy)
-    call deryBz (ti2,tf2,di2,sy,ffyB(:,3),  fsyB(:,3), fwyB(:,3),ppy,ysize(1),ysize(2),ysize(3),0,ubcz*ubcy)
+    call deryBx (td2,ta2,di2,sy,ffyB(:,1),  fsyB(:,1), fwyB(:,1),ppy,ysize(1),ysize(2),ysize(3),0,ubcx*ubcy)
+    call deryBz (tf2,tc2,di2,sy,ffyB(:,3),  fsyB(:,3), fwyB(:,3),ppy,ysize(1),ysize(2),ysize(3),0,ubcz*ubcy)
 
-    call deryBx (td2,ux2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
-    call deryBy (te2,uy2,di2,sy,ffyB(:,2),  fsyB(:,2) ,fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
-    call deryBz (tf2,uz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
-
-    call deryBx (tx2,bx2,di2,sy,ffypB(:,1),fsypB(:,1),fwypB(:,1),ppy,ysize(1),ysize(2),ysize(3),1,ubcx)
-    call deryBy (ty2,by2,di2,sy,ffyB(:,2),  fsyB(:,2) ,fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
-    call deryBz (tz2,bz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
-
-
-    ! Convective terms of y-pencil in tg2,th2,ti2
-
-    tg2(:,:,:) = tg2(:,:,:)  + uy2(:,:,:) * tx2(:,:,:) - by2(:,:,:) * td2(:,:,:)
-    th2(:,:,:) = th2(:,:,:)  + uy2(:,:,:) * ty2(:,:,:) - by2(:,:,:) * te2(:,:,:)
-    ti2(:,:,:) = ti2(:,:,:)  + uy2(:,:,:) * tz2(:,:,:) - by2(:,:,:) * tf2(:,:,:)
 
     call transpose_y_to_z(ux2,ux3)
     call transpose_y_to_z(uy2,uy3)
@@ -806,57 +769,35 @@ module mhd
 
     !WORK Z-PENCILS
 
-    td3(:,:,:) =  uz3(:,:,:)*bx3(:,:,:) - bz3(:,:,:)*ux3(:,:,:)
-    te3(:,:,:) =  uz3(:,:,:)*by3(:,:,:) - bz3(:,:,:)*uy3(:,:,:)
-    tf3(:,:,:) =  uz3(:,:,:)*bz3(:,:,:) - bz3(:,:,:)*uz3(:,:,:)
+    ta3(:,:,:) =  uy3(:,:,:)*bz3(:,:,:) - by3(:,:,:)*uz3(:,:,:)
+    tb3(:,:,:) =  ux3(:,:,:)*bz3(:,:,:) - bx3(:,:,:)*uz3(:,:,:)
+    tc3(:,:,:) =  ux3(:,:,:)*by3(:,:,:) - bx3(:,:,:)*uy3(:,:,:)
 
 
-    call derzBx (tg3,td3,di3,sz,ffzB(:,1),fszB(:,1),fwzB(:,1),zsize(1),zsize(2),zsize(3),0,ubcx*ubcz)
-    call derzBy (th3,te3,di3,sz,ffzB(:,2),fszB(:,2),fwzB(:,2),zsize(1),zsize(2),zsize(3),0,ubcy*ubcz)
-    call derzBz (ti3,tf3,di3,sz,ffzpB(:,3),fszpB(:,3),fwzpB(:,3),zsize(1),zsize(2),zsize(3),1,ubcz*ubcz)
-
-    call derzBx (td3,ux3,di3,sz,ffzpB(:,1),fszpB(:,1),fwzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
-    call derzBy (te3,uy3,di3,sz,ffzpB(:,2),fszpB(:,2),fwzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
-    call derzBz (tf3,uz3,di3,sz,ffzB(:,3),fszB(:,3),fwzB(:,3),zsize(1),zsize(2),zsize(3),0,ubcz)
-
-    call derzBx (tx3,bx3,di3,sz,ffzpB(:,1),fszpB(:,1),fwzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
-    call derzBy (ty3,by3,di3,sz,ffzpB(:,2),fszpB(:,2),fwzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
-    call derzBz (tz3,bz3,di3,sz,ffzB(:,3),fszB(:,3),fwzB(:,3),zsize(1),zsize(2),zsize(3),0,ubcz)
-
-    ! Convective terms of z-pencil in ta3,tb3,tc3
-
-    ta3(:,:,:) = tg3(:,:,:) + uz3(:,:,:) * tx3(:,:,:) - bz3(:,:,:) * td3(:,:,:)
-    tb3(:,:,:) = th3(:,:,:) + uz3(:,:,:) * ty3(:,:,:) - bz3(:,:,:) * te3(:,:,:)
-    tc3(:,:,:) = ti3(:,:,:) + uz3(:,:,:) * tz3(:,:,:) - bz3(:,:,:) * tf3(:,:,:)
-
-
-    ! Convective terms of z-pencil are in ta3 -> td3, tb3 -> te3, tc3 -> tf3
-    td3(:,:,:) = ta3(:,:,:)
-    te3(:,:,:) = tb3(:,:,:)
-    tf3(:,:,:) = tc3(:,:,:)
+    call derzBx (td3,ta3,di3,sz,ffzB(:,1),fszB(:,1),fwzB(:,1),zsize(1),zsize(2),zsize(3),0,ubcx*ubcz)
+    call derzBy (te3,tb3,di3,sz,ffzB(:,2),fszB(:,2),fwzB(:,2),zsize(1),zsize(2),zsize(3),0,ubcy*ubcz)
+    call derzBz (tf3,tc3,di3,sz,ffzpB(:,3),fszpB(:,3),fwzpB(:,3),zsize(1),zsize(2),zsize(3),1,ubcz*ubcz)
 
     !DIFFUSIVE TERMS IN Z
     call derzzBx (ta3,bx3,di3,sz,sfzpB(:,1),sszpB(:,1),swzpB(:,1),zsize(1),zsize(2),zsize(3),1,ubcx)
     call derzzBy (tb3,by3,di3,sz,sfzpB(:,2),sszpB(:,2),swzpB(:,2),zsize(1),zsize(2),zsize(3),1,ubcy)
     call derzzBz (tc3,bz3,di3,sz,sfzB(:,3) ,sszB(:,3) ,swzB(:,3) ,zsize(1),zsize(2),zsize(3),0,ubcz)
 
-
     ! Add convective and diffusive terms of z-pencil (half for skew-symmetric)
 
-    td3(:,:,:) = rrem*ta3(:,:,:) - half * td3(:,:,:)
-    te3(:,:,:) = rrem*tb3(:,:,:) - half * te3(:,:,:)
-    tf3(:,:,:) = rrem*tc3(:,:,:) - half * tf3(:,:,:)
+    td3(:,:,:) = rrem*ta3(:,:,:) - te3(:,:,:)
+    te3(:,:,:) = rrem*tb3(:,:,:) + te3(:,:,:)
+    tf3(:,:,:) = rrem*tc3(:,:,:)
 
 
     !WORK Y-PENCILS
-    call transpose_z_to_y(td3,td2)
-    call transpose_z_to_y(te3,te2)
-    call transpose_z_to_y(tf3,tf2)
+    call transpose_z_to_y(td3,ta2)
+    call transpose_z_to_y(te3,tb2)
+    call transpose_z_to_y(tf3,tc2)
 
-    ! Convective terms of y-pencil (tg2,th2,ti2) and sum of convective and diffusive terms of z-pencil (td2,te2,tf2) are now in tg2, th2, ti2 (half for skew-symmetric)
-    tg2(:,:,:) = td2(:,:,:) - half * tg2(:,:,:)
-    th2(:,:,:) = te2(:,:,:) - half * th2(:,:,:)
-    ti2(:,:,:) = tf2(:,:,:) - half * ti2(:,:,:)
+    ta2(:,:,:) = ta2(:,:,:) + tf2(:,:,:)
+    tb2(:,:,:) = tb2(:,:,:) 
+    tc2(:,:,:) = tc2(:,:,:) - td2(:,:,:)
 
 
     !DIFFUSIVE TERMS IN Y
@@ -875,7 +816,7 @@ module mhd
        endif
 
        !-->for uy
-       call deryyBy (te2,by2,di2,sy,sfyB(:,2),ssyB(:,2),swyB(:,2),ysize(1),ysize(2),ysize(3),0,ubcy)
+    call deryyBy (te2,by2,di2,sy,sfyB(:,2),ssyB(:,2),swyB(:,2),ysize(1),ysize(2),ysize(3),0,ubcy)
        if (istret.ne.0) then
           call deryBy (tf2,by2,di2,sy,ffyB(:,2),fsyB(:,2),fwyB(:,2),ppy,ysize(1),ysize(2),ysize(3),0,ubcy)
           do k = 1,ysize(3)
@@ -888,7 +829,7 @@ module mhd
        endif
 
        !-->for uz
-       call deryyBz (tf2,bz2,di2,sy,sfypB(:,3),ssypB(:,3),swypB(:,3),ysize(1),ysize(2),ysize(3),1,ubcz)
+    call deryyBz (tf2,bz2,di2,sy,sfypB(:,3),ssypB(:,3),swypB(:,3),ysize(1),ysize(2),ysize(3),1,ubcz)
        if (istret.ne.0) then
           call deryBz (tj2,bz2,di2,sy,ffypB(:,3),fsypB(:,3),fwypB(:,3),ppy,ysize(1),ysize(2),ysize(3),1,ubcz)
           do k = 1,ysize(3)
@@ -940,9 +881,9 @@ module mhd
     endif
 
     ! Add diffusive terms of y-pencil to convective and diffusive terms of y- and z-pencil
-    ta2(:,:,:) = rrem*td2(:,:,:) + tg2(:,:,:)
-    tb2(:,:,:) = rrem*te2(:,:,:) + th2(:,:,:)
-    tc2(:,:,:) = rrem*tf2(:,:,:) + ti2(:,:,:)
+    ta2(:,:,:) = rrem*td2(:,:,:) + ta2(:,:,:)
+    tb2(:,:,:) = rrem*te2(:,:,:) + tb2(:,:,:)
+    tc2(:,:,:) = rrem*tf2(:,:,:) + tc2(:,:,:)
 
     !WORK X-PENCILS
     call transpose_y_to_x(ta2,ta1)
@@ -954,14 +895,10 @@ module mhd
     call derxxBy (te1,B(:,:,:,2),di1,sx,sfxpB(:,2),ssxpB(:,2),swxpB(:,2),xsize(1),xsize(2),xsize(3),1,ubcy)
     call derxxBz (tf1,B(:,:,:,3),di1,sx,sfxpB(:,3),ssxpB(:,3),swxpB(:,3),xsize(1),xsize(2),xsize(3),1,ubcz)
 
-    td1(:,:,:) = rrem * td1(:,:,:)
-    te1(:,:,:) = rrem * te1(:,:,:)
-    tf1(:,:,:) = rrem * tf1(:,:,:)
-
     !FINAL SUM: DIFF TERMS + CONV TERMS
-    dB(:,:,:,1) = ta1(:,:,:) - half*tg1(:,:,:)  + td1(:,:,:)
-    dB(:,:,:,2) = tb1(:,:,:) - half*th1(:,:,:)  + te1(:,:,:)
-    dB(:,:,:,3) = tc1(:,:,:) - half*ti1(:,:,:)  + tf1(:,:,:)
+    dB(:,:,:,1) = rrem * td1(:,:,:) + ta1(:,:,:) 
+    dB(:,:,:,2) = rrem * te1(:,:,:) + tb1(:,:,:) -tf1(:,:,:)
+    dB(:,:,:,3) = rrem * te1(:,:,:) + tc1(:,:,:) +te1(:,:,:)
 
     return
 
@@ -980,29 +917,15 @@ module mhd
     real(mytype),dimension(xsize(1),xsize(2),xsize(3),1:3) :: dphib
 
     integer :: i,j,k,nlock,poissiter
-    logical :: converged
     !
     nlock=1 !! Corresponds to computing div(u*)
     !
-    phib=divergence_scalar(Bm,nlock) !todo: this will have incorrect BCs?
-    !
-    converged=.false.
-    !
-    poissiter = 0
-    !
-    do while(.not.converged)
-      !
+    do poissiter = 1, 1
+      phib=divergence_scalar(Bm,nlock) !todo: this will have incorrect BCs?
       call poisson(phib)
-      !
       CALL gradp(dphib(:,:,:,1),dphib(:,:,:,2),dphib(:,:,:,3),phib)
-      !
-      converged=.true.
-      !
-      poissiter = poissiter + 1
-      !
+      Bm=Bm-dphib
     enddo
-    !
-    Bm=Bm-dphib
     !
     sync_Bm_needed=.true.
     !

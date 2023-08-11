@@ -265,6 +265,7 @@ contains
     use var, only : di2
     use variables
     use decomp_2d
+    use mhd, only : Bm, mhd_active, mhd_equation 
 
     implicit none
 
@@ -302,7 +303,15 @@ contains
           !if (nclySn.eq.2) g_sc(:,2) = zero
        endif
     endif
-
+    
+    if( mhd_active .and. iimplicit==0 .and. mhd_equation ) then
+       Bm(:,1,:,2) = one
+       Bm(:,ny,:,2) = one
+       Bm(:,1,:,1) = zero
+       Bm(:,ny,:,1) = zero
+       Bm(:,1,:,3) = zero
+       Bm(:,ny,:,3) = zero
+    endif
 
   end subroutine boundary_conditions_channel
   !############################################################################
