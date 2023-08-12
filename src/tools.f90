@@ -780,6 +780,7 @@ contains
      use param, only : cfl_diff_sum, cfl_diff_x, cfl_diff_y, cfl_diff_z
      use variables, only : dyp
      use decomp_2d, only : nrank
+     use mhd, only: mhd_active, mhd_equation,rem
 
      implicit none
 
@@ -804,6 +805,29 @@ contains
         write(*,*) '==========================================================='
      endif
 
+     if( mhd_active.and.mhd_equation) then
+ 
+        cfl_diff_x = dt/ (dx**2) / rem
+        cfl_diff_z = dt/ (dz**2) / rem
+   
+        if (istret == 0) then
+           cfl_diff_y = dt / (dy**2) / rem
+        else
+           cfl_diff_y = dt / (minval(dyp)**2) / rem
+        end if
+   
+        cfl_diff_sum = cfl_diff_x + cfl_diff_y + cfl_diff_z
+   
+        if (nrank==0) then
+           write(*,*) '==========================================================='
+           write(*,*) 'Magnetic Diffusion number'
+           write(*,"(' B cfl_diff_x             :        ',F13.8)") cfl_diff_x
+           write(*,"(' B cfl_diff_y             :        ',F13.8)") cfl_diff_y
+           write(*,"(' B cfl_diff_z             :        ',F13.8)") cfl_diff_z
+           write(*,"(' B cfl_diff_sum           :        ',F13.8)") cfl_diff_sum
+           write(*,*) '==========================================================='
+        endif
+     endif    
      return
   end subroutine compute_cfldiff
   !##################################################################

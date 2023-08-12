@@ -70,6 +70,14 @@ module variables
   real(mytype),allocatable,dimension(:) :: ffzS,sfzS,fszS,fwzS,sszS,swzS
   real(mytype),allocatable,dimension(:) :: ffzpS,sfzpS,fszpS,fwzpS,sszpS,swzpS
 
+  real(mytype),allocatable,dimension(:,:) :: ffxB,sfxB,fsxB,fwxB,ssxB,swxB
+  real(mytype),allocatable,dimension(:,:) :: ffxpB,sfxpB,fsxpB,fwxpB,ssxpB,swxpB
+  real(mytype),allocatable,dimension(:,:) :: ffyB,sfyB,fsyB,fwyB,ssyB,swyB
+  real(mytype),allocatable,dimension(:,:) :: ffypB,sfypB,fsypB,fwypB,ssypB,swypB
+  real(mytype),allocatable,dimension(:,:) :: ffzB,sfzB,fszB,fwzB,sszB,swzB
+  real(mytype),allocatable,dimension(:,:) :: ffzpB,sfzpB,fszpB,fwzpB,sszpB,swzpB
+
+
   real(mytype), save, allocatable, dimension(:,:) :: sx,vx
   real(mytype), save, allocatable, dimension(:,:) :: sy,vy
   real(mytype), save, allocatable, dimension(:,:) :: sz,vz
@@ -127,7 +135,10 @@ module variables
   ! scalar, ncly1 = 2, nclyn = 1, npaire = 1
   real(mytype), allocatable, target, dimension(:,:) :: aam211t,bbm211t,ccm211t,ddm211t,eem211t,ggm211t,hhm211t,wwm211t,zzm211t
   real(mytype), allocatable, target, dimension(:,:) :: rrm211t,qqm211t,vvm211t,ssm211t
-
+  ! Bx, ncly1 = 2, nclyn = 2
+  real(mytype), allocatable, target, dimension(:,:) :: aamB,bbmB,ccmB,ddmB,eemB,ggmB,hhmB,wwmB,zzmB
+  real(mytype), allocatable, target, dimension(:,:) :: rrmB,qqmB,vvmB,ssmB
+  real(mytype), allocatable, target, dimension(:,:) :: sssmB, zzzmB, ttmB, uumB  !!Nona
 
   ABSTRACT INTERFACE
      SUBROUTINE DERIVATIVE_X(t,u,r,s,ff,fs,fw,nx,ny,nz,npaire,lind)
@@ -175,6 +186,22 @@ module variables
   PROCEDURE (DERIVATIVE_Z) derz_00,derz_11,derz_12,derz_21,derz_22,&
        derzz_00,derzz_11,derzz_12,derzz_21,derzz_22
   PROCEDURE (DERIVATIVE_Z), POINTER :: derz,derzz,derzS,derzzS
+
+  procedure (DERIVATIVE_X), pointer :: derxBx, derxxBx
+  procedure (DERIVATIVE_Y), pointer :: deryBx
+  procedure (DERIVATIVE_YY), pointer :: deryyBx
+  procedure (DERIVATIVE_Z), pointer :: derzBx, derzzBx
+
+  procedure (DERIVATIVE_X), pointer :: derxBy, derxxBy
+  procedure (DERIVATIVE_Y), pointer :: deryBy
+  procedure (DERIVATIVE_YY), pointer :: deryyBy
+  procedure (DERIVATIVE_Z), pointer :: derzBy, derzzBy
+
+  procedure (DERIVATIVE_X), pointer :: derxBz, derxxBz
+  procedure (DERIVATIVE_Y), pointer :: deryBz
+  procedure (DERIVATIVE_YY), pointer :: deryyBz
+  procedure (DERIVATIVE_Z), pointer :: derzBz, derzzBz
+
 
   !O6SVV
   real(mytype),allocatable,dimension(:) :: newsm,newtm,newsmt,newtmt
@@ -266,6 +293,10 @@ module param
 
   integer :: nclx1,nclxn,ncly1,nclyn,nclz1,nclzn
   integer :: nclxS1,nclxSn,nclyS1,nclySn,nclzS1,nclzSn
+  integer :: nclxBx1,nclxBxn,nclyBx1,nclyBxn,nclzBx1,nclzBxn
+  integer :: nclxBy1,nclxByn,nclyBy1,nclyByn,nclzBy1,nclzByn
+  integer :: nclxBz1,nclxBzn,nclyBz1,nclyBzn,nclzBz1,nclzBzn
+  integer, dimension(3) :: nclxB1,nclxBn,nclyB1,nclyBn,nclzB1,nclzBn
 
   !logical variable for boundary condition that is true in periodic case
   !and false otherwise
@@ -322,7 +353,7 @@ module param
   real(mytype) :: cfl_diff_x,cfl_diff_y,cfl_diff_z,cfl_diff_sum
 
   !!
-  real(mytype) :: xcst
+  real(mytype) :: xcst, xcstB
   real(mytype), allocatable, dimension(:) :: xcst_sc
   real(mytype), allocatable, dimension(:,:) :: alpha_sc, beta_sc, g_sc
   real(mytype) :: g_bl_inf, f_bl_inf
@@ -376,7 +407,7 @@ module param
   integer :: NTurbines, NActuatorlines
   character, dimension(100) :: TurbinesPath*80, ActuatorlinesPath*80
   real(mytype) :: eps_factor ! Smoothing factor
-  
+
   character :: filesauve*80, filenoise*80, &
        nchamp*80,filepath*80, fileturb*80, filevisu*80, datapath*80
   real(mytype), dimension(5) :: adt,bdt,cdt,ddt,gdt
