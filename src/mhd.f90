@@ -99,9 +99,9 @@ module mhd
     integer :: k
 
     if( iimplicit == 1 ) then
-        call inttimp(Bm(:,:,:,1), dBm(:,:,:,1,1), 0, -1, mhdvar=1 )
-        call inttimp(Bm(:,:,:,2), dBm(:,:,:,2,1), 0, -1, mhdvar=2 )
-        call inttimp(Bm(:,:,:,3), dBm(:,:,:,3,1), 0, -1, mhdvar=3 )
+        call inttimp(Bm(:,:,:,1), dBm(:,:,:,1,:), 0, -1, mhdvar=1 )
+        call inttimp(Bm(:,:,:,2), dBm(:,:,:,2,:), 0, -1, mhdvar=2 )
+        call inttimp(Bm(:,:,:,3), dBm(:,:,:,3,:), 0, -1, mhdvar=3 )
     else
        if(itimescheme.eq.3) then
            !>>> Adams-Bashforth third order (AB3)
